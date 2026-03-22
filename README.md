@@ -1,6 +1,6 @@
 # runwai
 
-runwai is a tiny macOS menu bar app for codex, spark, and gemini usage runway.
+runwai is a macOS menu bar app for codex, spark, and gemini usage runway.
 
 It answers three things fast:
 
@@ -8,7 +8,7 @@ It answers three things fast:
 - when should i stop?
 - how much runway is left this week?
 
-<img src="docs/assets/runwai-codex.png" alt="runwai screenshot" width="520" />
+<img src="docs/assets/runwai-codex.png" alt="runwai screenshot" width="420" />
 
 ## current build
 
