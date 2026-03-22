@@ -8,7 +8,7 @@ It answers three things fast:
 - when should i stop?
 - how much runway is left this week?
 
-![runwai screenshot](docs/assets/runwai-codex.png)
+<img src="docs/assets/runwai-codex.png" alt="runwai screenshot" width="520" />
 
 ## current build
 
