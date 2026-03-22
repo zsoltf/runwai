@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "docs": [
+    {
+      "path": "docs/index.md",
+      "summary": "Broader docs map for workflow, runtime-state, and host-runtime references after the main entrypoint.",
+      "read_when": [
+        "you already started from README.md and need the broader docs map",
+        "you need to find where a policy, runtime-state, or host-runtime doc lives"
+      ],
+      "status": "optional"
+    },
+    {
+      "path": "docs/workflow/index.md",
+      "summary": "Authoritative workflow core covering default modes, core rules, and when to scale process up.",
+      "read_when": [
+        "starting or resuming ordinary work in the repo",
+        "you want the shortest workflow contract before reading deeper references"
+      ],
+      "status": "default"
+    },
+    {
+      "path": "docs/workflow/decision-table.md",
+      "summary": "Concrete triggers for when plans, review, turn ownership, and the production standard are required.",
+      "read_when": [
+        "you are deciding how much workflow is necessary",
+        "terms like non-trivial or high-risk feel too subjective"
+      ],
+      "status": "default"
+    },
+    {
+      "path": "docs/workflow/policy.md",
+      "summary": "Honesty, verification, safety, and escalation rules for the workflow.",
+      "read_when": [
+        "reporting results",
+        "deciding whether to escalate or claim verification"
+      ],
+      "status": "default"
+    },
+    {
+      "path": "docs/workflow/roles.md",
+      "summary": "Planner, reviewer, executor, verifier, and researcher role boundaries.",
+      "read_when": [
+        "splitting responsibilities",
+        "avoiding planning or verification drift during implementation"
+      ],
+      "status": "default"
+    },
+    {
+      "path": "docs/workflow/planning.md",
+      "summary": "How to decide when a dated ExecPlan is needed and how to keep planning light.",
+      "read_when": [
+        "you are deciding whether to write or update an ExecPlan",
+        "the decision table points toward standard or high-risk work"
+      ],
+      "status": "default"
+    },
+    {
+      "path": "docs/workflow/review.md",
+      "summary": "Default review expectations, escalation rules, and optional heavier review paths.",
+      "read_when": [
+        "you need a second opinion",
+        "you are deciding whether formal review artifacts are worth the cost"
+      ],
+      "status": "default"
+    },
+    {
+      "path": "docs/ops/oracle-advisory.md",
+      "summary": "Optional Oracle advisory playbook for GPT Pro and Gemini second opinions using local host or VM setup.",
+      "read_when": [
+        "you want an external model check",
+        "you are stuck after local attempts",
+        "you need latest-tooling or architecture critique"
+      ],
+      "status": "optional"
+    },
+    {
+      "path": "docs/workflow/implementation.md",
+      "summary": "Implementation expectations, readiness checks, and verification posture.",
+      "read_when": [
+        "you are ready to edit code",
+        "you need to know what counts as done"
+      ],
+      "status": "default"
+    },
+    {
+      "path": "docs/workflow/engines.md",
+      "summary": "Workflow engine and compatibility details, including when older paths still exist.",
+      "read_when": [
+        "you are dealing with legacy or compatibility workflow artifacts",
+        "engine metadata looks unfamiliar"
+      ],
+      "status": "advanced"
+    },
+    {
+      "path": "docs/workflow/invariants.md",
+      "summary": "Hard workflow invariants, router constraints, and guard expectations.",
+      "read_when": [
+        "changing workflow code or docs",
+        "debugging why a workflow guard is failing"
+      ],
+      "status": "default"
+    },
+    {
+      "path": "docs/ops/production-engineering-standard.md",
+      "summary": "Production bar for quality, risk, and verification when a change affects production behavior or release-sensitive work.",
+      "read_when": [
+        "a change affects production behavior or reliability",
+        "you need the quality bar for a release-sensitive task"
+      ],
+      "status": "advanced"
+    },
+    {
+      "path": "docs/ops/host-runtime.md",
+      "summary": "Host-machine setup boundary for local Codex config, MCP wiring, and other non-portable runtime assumptions.",
+      "read_when": [
+        "you need to separate repo policy from local machine setup",
+        "you are wiring local tools, MCP servers, or browser automation"
+      ],
+      "status": "advanced"
+    },
+    {
+      "path": "docs/ops/oracle-advisory.md",
+      "summary": "Optional Oracle advisory playbook for external judgment lanes backed by local host setup.",
+      "read_when": [
+        "you want an external model check",
+        "you are wiring or using a local Oracle advisory setup"
+      ],
+      "status": "optional"
+    }
+  ]
+}
