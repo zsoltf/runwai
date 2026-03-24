@@ -133,17 +133,18 @@ APP_STORE_CONNECT_ISSUER_ID=00000000-0000-0000-0000-000000000000
 
 Pass those together with `APPLE_TEAM_ID` and `APPLE_NOTARY_PROFILE`.
 
-## 7. current blocker on this mac
+## 7. current state on this mac
 
-Right now this Mac is not release-ready yet.
+This Mac is release-ready.
 
 Last verified state:
 
-- `security find-identity -v -p codesigning` returned `0 valid identities found`
-- the notary profile was not usable yet
+- `Developer ID Application` signing is configured
+- `runwai-notary` is stored and usable
+- notarization and stapling already succeeded for a previous release build
 
-So the next real step is still:
+So the next real step is just:
 
-1. install `Developer ID Application`
-2. store `runwai-notary`
-3. rerun preflight
+1. rerun preflight
+2. build the signed release
+3. upload the zip to GitHub Releases

@@ -7,7 +7,7 @@ struct RunwaiApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarContentView(model: model)
-                .frame(width: 420)
+                .frame(width: 420, height: 760, alignment: .topLeading)
         } label: {
             MenuBarLabelView(model: model)
         }

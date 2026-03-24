@@ -17,23 +17,26 @@ struct MenuBarContentView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-            providerTabs
-            issueBanners
-            if model.isPlaceholderSnapshot {
-                setupSection
-            } else {
-                focusSection
-                weeklySection
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 14) {
+                header
+                providerTabs
+                issueBanners
+                if model.isPlaceholderSnapshot {
+                    setupSection
+                } else {
+                    focusSection
+                    weeklySection
 
-                if showsQuickUpdate {
-                    quickUpdateSection
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    if showsQuickUpdate {
+                        quickUpdateSection
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
         }
-        .padding(20)
+        .scrollBounceBehavior(.basedOnSize)
         .background {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(popoverFillStyle)
@@ -44,7 +47,6 @@ struct MenuBarContentView: View {
         }
         .shadow(color: Color.black.opacity(shellShadowOpacity), radius: 22, y: 12)
         .padding(10)
-        .animation(.spring(response: 0.28, dampingFraction: 0.9), value: showsQuickUpdate)
     }
 
     private var header: some View {

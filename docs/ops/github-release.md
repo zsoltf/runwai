@@ -1,6 +1,6 @@
 # GitHub hosting and release
 
-This is the clean path for getting `runwai` onto GitHub and publishing the first download.
+This is the clean path for publishing a new `runwai` download on GitHub.
 
 Current GitHub references:
 
@@ -61,15 +61,15 @@ The output you want is:
 
 - `build/release/dist/runwai-macos.zip`
 
-## 5. publish the first release
+## 5. publish the next release
 
 Web flow:
 
 1. open the repo
 2. click `Releases`
 3. click `Draft a new release`
-4. create tag `v0.1.0`
-5. title it `runwai 0.1.0`
+4. create tag `v0.1.1`
+5. title it `runwai 0.1.1`
 6. upload `build/release/dist/runwai-macos.zip`
 7. paste short notes
 8. publish
@@ -77,10 +77,10 @@ Web flow:
 CLI flow:
 
 ```bash
-gh release create v0.1.0 \
+gh release create v0.1.1 \
   build/release/dist/runwai-macos.zip \
-  --title "runwai 0.1.0" \
-  --notes-file docs/product/release-notes-v0.1.0.md
+  --title "runwai 0.1.1" \
+  --notes-file docs/product/release-notes-v0.1.1.md
 ```
 
 ## 6. final pre-post check
