@@ -36,29 +36,41 @@ struct RenderRunwaiScreenshot {
         let appearanceRawValue = CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : "light"
         let provider = UsageProvider(rawValue: providerRawValue) ?? .codex
         let colorScheme: ColorScheme = appearanceRawValue == "dark" ? .dark : .light
-        let previewSuiteName = "app.runwai.preview"
-        let defaults = UserDefaults(suiteName: previewSuiteName) ?? .standard
-        defaults.removePersistentDomain(forName: previewSuiteName)
+        let previewSuiteName = "app.runwai.preview.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: previewSuiteName) else {
+            fatalError("Could not create isolated preview defaults")
+        }
+        defer { defaults.removePersistentDomain(forName: previewSuiteName) }
         let store = ManualUsageStore(defaults: defaults)
         let referenceNow = Date()
 
         seedPreviewData(store: store, now: referenceNow)
 
         let model = UsageMonitorModel(store: store, automaticSyncServices: [:])
+        model.refreshTimer?.invalidate()
         model.selectedProvider = provider
         model.now = referenceNow
 
-        let view = MenuBarContentView(model: model, showsHeaderUtilities: false)
-            .frame(width: 380)
+        let view = MenuBarContentView(model: model)
+            .frame(width: 420, height: 640)
             .environment(\.colorScheme, colorScheme)
 
-        let renderer = ImageRenderer(content: view)
-        renderer.scale = 2
+        // A hosting view renders the actual AppKit scroll surface, unlike ImageRenderer.
+        _ = NSApplication.shared
+        let bounds = NSRect(x: 0, y: 0, width: 420, height: 640)
+        let host = NSHostingView(rootView: view)
+        let window = NSWindow(contentRect: bounds, styleMask: .borderless,
+                              backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
+        window.contentView = host
+        host.frame = bounds
+        host.layoutSubtreeIfNeeded()
 
-        guard let image = renderer.nsImage,
-              let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff),
-              let png = rep.representation(using: NSBitmapImageRep.FileType.png, properties: [:]) else {
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: bounds) else {
+            fatalError("Could not allocate preview bitmap")
+        }
+        host.cacheDisplay(in: bounds, to: rep)
+        guard let png = rep.representation(using: .png, properties: [:]) else {
             fputs("failed to render image\n", stderr)
             exit(1)
         }
@@ -134,6 +146,7 @@ swiftc -target arm64-apple-macos14.0 -framework SwiftUI -framework AppKit \
   "$repo_root/Runwai/Models/HeroStyle.swift" \
   "$repo_root/Runwai/Models/RunwaiFormatters.swift" \
   "$repo_root/Runwai/Models/UsageHistoryPoint.swift" \
+  "$repo_root/Runwai/Models/UsageActivitySeries.swift" \
   "$repo_root/Runwai/Models/UsageProvider.swift" \
   "$repo_root/Runwai/Models/UsageSnapshot.swift" \
   "$repo_root/Runwai/Models/UsageSourceMode.swift" \
@@ -146,6 +159,7 @@ swiftc -target arm64-apple-macos14.0 -framework SwiftUI -framework AppKit \
   "$repo_root/Runwai/Views/MenuBarContentView+Style.swift" \
   "$repo_root/Runwai/Views/MenuBarLabelView.swift" \
   "$repo_root/Runwai/Views/RunwaiPacingBars.swift" \
+  "$repo_root/Runwai/Views/UsageActivityView.swift" \
   "$repo_root/Runwai/Views/SettingsView.swift" \
   "$tmp_swift" \
   -o "$tmp_binary"
