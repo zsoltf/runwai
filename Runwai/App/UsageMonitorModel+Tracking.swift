@@ -35,7 +35,7 @@ extension UsageMonitorModel {
     func formattedNumber(_ value: Double) -> String {
         value.formatted(
             .number
-                .precision(.fractionLength(value.rounded() == value ? 0 : 1))
+                .precision(.fractionLength(0...1))
         )
     }
 
@@ -109,7 +109,7 @@ extension UsageMonitorModel {
 
         let points = trackedHistoryPoints
 
-        if let lastBeforeStart = points.last(where: { $0.timestamp < trackingStart }) {
+        if let lastBeforeStart = points.last(where: { $0.timestamp <= trackingStart }) {
             return UsageHistoryPoint(
                 timestamp: trackingStart,
                 remainingPercent: lastBeforeStart.remainingPercent
@@ -216,8 +216,10 @@ extension UsageMonitorModel {
             .filter { $0.timestamp >= windowStart(for: snapshot).addingTimeInterval(-86_400) }
             .sorted { $0.timestamp < $1.timestamp }
 
-        if let last = history.last,
-           abs(last.remainingPercent - point.remainingPercent) < 0.05 {
+        // Retain both ends of a plateau so the chart does not turn a break into burn.
+        if history.count >= 2,
+           abs(history[history.count - 1].remainingPercent - point.remainingPercent) < 0.05,
+           abs(history[history.count - 2].remainingPercent - point.remainingPercent) < 0.05 {
             history[history.count - 1] = point
             return history
         }
@@ -235,8 +237,9 @@ extension UsageMonitorModel {
                 remainingPercent: point.remainingPercent
             )
 
-            if let last = normalized.last,
-               abs(last.remainingPercent - normalizedPoint.remainingPercent) < 0.05 {
+            if normalized.count >= 2,
+               abs(normalized[normalized.count - 1].remainingPercent - normalizedPoint.remainingPercent) < 0.05,
+               abs(normalized[normalized.count - 2].remainingPercent - normalizedPoint.remainingPercent) < 0.05 {
                 normalized[normalized.count - 1] = normalizedPoint
             } else {
                 normalized.append(normalizedPoint)

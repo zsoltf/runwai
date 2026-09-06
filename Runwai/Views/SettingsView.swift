@@ -9,14 +9,6 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("General") {
-                Picker("Provider", selection: $model.selectedProvider) {
-                    ForEach(UsageProvider.visibleProviders) { provider in
-                        Text(provider.displayName)
-                            .tag(provider)
-                    }
-                }
-                .pickerStyle(.segmented)
-
                 if model.availableSourceModes.count > 1 {
                     Picker("Source", selection: $model.selectedSourceMode) {
                         ForEach(model.availableSourceModes) { mode in
@@ -168,10 +160,9 @@ struct SettingsView: View {
             Section("About runwai") {
                 PreviewRow(label: "Build", value: model.buildVersionLine)
                 PreviewRow(label: "Data", value: "Local only")
-                PreviewRow(label: "Current provider", value: model.providerName)
                 PreviewRow(label: "Current source", value: model.sourceModeSummaryLine)
 
-                Text("runwai is a local-first menu bar utility for keeping codex and gemini pacing legible at a glance.")
+                Text("Your Codex runway, at a glance.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

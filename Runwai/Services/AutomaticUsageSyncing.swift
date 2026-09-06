@@ -37,8 +37,9 @@ enum AutomaticUsageSyncDetail: Equatable {
 
 struct CodexAutoSyncDetail: Equatable {
     let planType: String?
-    let primaryRemainingPercent: Double
-    let primaryResetAt: Date
+    // Normalized 5-hour values, absent when the provider only reports a week.
+    let primaryRemainingPercent: Double?
+    let primaryResetAt: Date?
     let secondaryRemainingPercent: Double
     let secondaryResetAt: Date
 }

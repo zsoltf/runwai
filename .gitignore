@@ -6,6 +6,7 @@ xcuserdata/
 .agent/
 /AGENTS.md
 /GEMINI.md
+/LEARNINGS.md
 TokenWatcher.xcodeproj/
 *.xcresult
 *.p8

@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import runwai
 
+@Suite(.serialized)
 struct CodexQuotaSyncServiceTests {
     @Test
     func codexSparkSyncReadsLatestRateLimitsFromSqliteLog() async throws {
@@ -53,7 +54,7 @@ struct CodexQuotaSyncServiceTests {
             return
         }
 
-        #expect(abs(detail.primaryRemainingPercent - 94) < 0.1)
+        #expect(try #require(detail.primaryRemainingPercent) == 94)
         #expect(detail.primaryResetAt == Date(timeIntervalSince1970: 1_774_013_333))
         #expect(detail.secondaryRemainingPercent == 95)
     }
@@ -105,7 +106,7 @@ struct CodexQuotaSyncServiceTests {
             return
         }
 
-        #expect(abs(detail.primaryRemainingPercent - 82) < 0.1)
+        #expect(try #require(detail.primaryRemainingPercent) == 82)
         #expect(detail.primaryResetAt == Date(timeIntervalSince1970: 1_774_011_111))
         #expect(detail.planType == "pro")
     }
@@ -202,7 +203,7 @@ struct CodexQuotaSyncServiceTests {
             return
         }
 
-        #expect(abs(detail.primaryRemainingPercent - 98) < 0.1)
+        #expect(try #require(detail.primaryRemainingPercent) == 98)
         #expect(detail.primaryResetAt == Date(timeIntervalSince1970: 1_774_013_333))
         #expect(detail.secondaryRemainingPercent == 80)
     }
@@ -319,9 +320,86 @@ struct CodexQuotaSyncServiceTests {
             return
         }
 
-        #expect(abs(detail.primaryRemainingPercent - 99) < 0.1)
+        #expect(try #require(detail.primaryRemainingPercent) == 99)
         #expect(detail.primaryResetAt == Date(timeIntervalSince1970: 1_774_016_666))
         #expect(detail.secondaryRemainingPercent == 98)
+    }
+
+    @Test(arguments: ["primary", "secondary", "omitted", "restored", "reversed", "no-week"])
+    func liveWindowsAreIdentifiedByDuration(shape: String) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let authURL = directory.appendingPathComponent("auth.json")
+        try Data(#"{"tokens":{"access_token":"fixture-token"}}"#.utf8).write(to: authURL)
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            URLProtocolStub.requestHandler = nil
+        }
+        let week: [String: Any] = ["used_percent": 49, "limit_window_seconds": 604800, "reset_at": 1789281776]
+        let short: [String: Any] = ["used_percent": 90, "limit_window_seconds": 18000, "reset_at": 1788739184]
+        var limit: [String: Any]
+        switch shape {
+        case "primary": limit = ["primary_window": week, "secondary_window": NSNull()]
+        case "secondary": limit = ["primary_window": NSNull(), "secondary_window": week]
+        case "omitted": limit = ["primary_window": week]
+        case "restored": limit = ["primary_window": short, "secondary_window": week]
+        case "reversed": limit = ["primary_window": week, "secondary_window": short]
+        default: limit = ["primary_window": short, "secondary_window": NSNull()]
+        }
+        let data = try JSONSerialization.data(withJSONObject: ["plan_type": "pro", "rate_limit": limit])
+        URLProtocolStub.requestHandler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, data)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [URLProtocolStub.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let service = CodexQuotaSyncService(databaseURL: directory.appendingPathComponent("absent.sqlite"),
+            authURL: authURL, usageURL: URL(string: "https://example.com/usage")!, urlSession: session)
+        if shape == "no-week" {
+            await #expect(throws: CodexQuotaSyncError.self) { try await service.fetchPayload() }
+            return
+        }
+        let payload = try await service.fetchPayload()
+        #expect(payload.usageSnapshot.usedUnits == 49)
+        #expect(payload.usageSnapshot.windowDuration == 604800)
+        #expect(payload.usageSnapshot.resetAt == Date(timeIntervalSince1970: 1789281776))
+        #expect(abs(payload.usageSnapshot.lastUpdatedAt.timeIntervalSinceNow) < 5)
+        guard case let .codex(detail)? = payload.detail else { Issue.record("Missing detail"); return }
+        let hasShort = shape == "restored" || shape == "reversed"
+        #expect(detail.primaryRemainingPercent == (hasShort ? 10 : nil))
+        #expect(detail.primaryResetAt == (hasShort ? Date(timeIntervalSince1970: 1788739184) : nil))
+    }
+
+    @Test(arguments: [UsageProvider.codex, .codexSpark])
+    func localWeeklyOnlyWindowsRemainUsable(provider: UsageProvider) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let databaseURL = directory.appendingPathComponent("logs_1.sqlite")
+        let windows: [String: Any] = ["primary": ["used_percent": 49, "window_minutes": 10080, "reset_at": 1789281776], "secondary": NSNull()]
+        let data = try JSONSerialization.data(withJSONObject: ["type": "codex.rate_limits", "plan_type": "pro",
+            "rate_limits": windows, "additional_rate_limits": ["GPT-5.3-Codex-Spark": windows]], options: [.sortedKeys])
+        // The existing log query requires type first, matching the websocket log format.
+        let json = String(decoding: data, as: UTF8.self)
+            .replacingOccurrences(of: ",\"type\":\"codex.rate_limits\"", with: "")
+        let message = "websocket event: {\"type\":\"codex.rate_limits\"," + json.dropFirst()
+        try runSQLite(sql: """
+            CREATE TABLE logs (id INTEGER PRIMARY KEY, ts INTEGER, target TEXT, message TEXT);
+            INSERT INTO logs VALUES (1, 1788720000, 'codex_api::endpoint::responses_websocket', '\(message)');
+            """, databaseURL: databaseURL)
+        let service = CodexQuotaSyncService(provider: provider,
+            sourceMode: provider == .codex ? .codexApp : .codexSparkApp,
+            additionalRateLimitName: provider == .codexSpark ? "GPT-5.3-Codex-Spark" : nil,
+            databaseURL: databaseURL)
+        let payload = try await service.fetchPayload()
+        #expect(payload.usageSnapshot.usedUnits == 49)
+        #expect(payload.usageSnapshot.windowDuration == 604800)
+        #expect(payload.usageSnapshot.lastUpdatedAt == Date(timeIntervalSince1970: 1788720000))
+        #expect(payload.historyPoints?.last?.remainingPercent == 51)
+        guard case let .codex(detail)? = payload.detail else { Issue.record("Missing detail"); return }
+        #expect(detail.primaryRemainingPercent == nil)
+        #expect(detail.primaryResetAt == nil)
     }
 
     private func runSQLite(sql: String, databaseURL: URL) throws {

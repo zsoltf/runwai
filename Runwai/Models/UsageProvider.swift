@@ -5,7 +5,7 @@ enum UsageProvider: String, Codable, CaseIterable, Identifiable {
     case codexSpark
     case gemini
 
-    static let visibleProviders: [UsageProvider] = allCases
+    static let visibleProviders: [UsageProvider] = [.codex]
 
     var id: String { rawValue }
 
@@ -227,7 +227,7 @@ enum UsageProvider: String, Codable, CaseIterable, Identifiable {
         case .day:
             switch trackingScope {
             case .day:
-                return "safe room left today"
+                return "left today"
             case .window:
                 return "safe room left in this window"
             }

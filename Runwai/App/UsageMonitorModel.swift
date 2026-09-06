@@ -507,19 +507,6 @@ final class UsageMonitorModel {
         }
     }
 
-    var focusHeroPrimaryNote: String {
-        if isTodayOverBudget {
-            return ""
-        }
-
-        switch heroStyle {
-        case .remainingFirst:
-            return focusBudgetNote
-        case .timeFirst:
-            return ""
-        }
-    }
-
     var focusHeroSecondaryValue: String {
         if isTodayOverBudget {
             return postLimitCarryoverValue
@@ -683,20 +670,16 @@ final class UsageMonitorModel {
 
     var overBudgetStatusLine: String {
         guard isTodayOverBudget else {
-            if reachesTargetAfterBoundary {
-                switch summary.status {
-                case .ahead:
-                    return "Ahead this week"
-                case .onPace:
-                    return "On track this week"
-                case .behind:
-                    return "Behind this week"
-                case .exhausted:
-                    return "Exhausted"
-                }
+            switch summary.status {
+            case .ahead:
+                return selectedProvider.rateUnit == .day ? "Ahead this week" : "Ahead of pace"
+            case .onPace:
+                return selectedProvider.rateUnit == .day ? "On pace this week" : "On pace"
+            case .behind:
+                return selectedProvider.rateUnit == .day ? "Behind this week" : "Behind pace"
+            case .exhausted:
+                return "Exhausted"
             }
-
-            return paceStatusLine
         }
 
         switch selectedProvider.rateUnit {
@@ -789,7 +772,7 @@ final class UsageMonitorModel {
         }
 
         if reachesTargetAfterBoundary {
-            return "safe"
+            return "on track"
         }
 
         guard let estimatedStopAt else {
@@ -807,13 +790,13 @@ final class UsageMonitorModel {
         if reachesTargetAfterBoundary {
             switch selectedProvider.trackingScope {
             case .day:
-                return "safe today"
+                return "today's budget"
             case .window:
                 return "safe through reset"
             }
         }
 
-        return "stop around"
+        return estimatedStopAt == nil ? "need more history" : "budget lasts until"
     }
 
     var estimatedStopCountdownLine: String {
@@ -852,7 +835,7 @@ final class UsageMonitorModel {
             return todayBudgetSummaryLine
         }
 
-        return "Hit today's target in \(Formatters.relativeDuration.string(from: interval) ?? "soon")."
+        return "At this pace, today's budget lasts \(Formatters.relativeDuration.string(from: interval) ?? "a little longer")."
     }
 
     var safeUnitsPerDayLine: String {
@@ -1147,18 +1130,10 @@ final class UsageMonitorModel {
     }
 
     var focusTargetValue: String {
-        if isTodayOverBudget {
-            return safeTodayValue
-        }
-
-        return safeTodayValue
+        safeTodayValue
     }
 
     var focusTargetLabel: String {
-        if isTodayOverBudget {
-            return "today limit"
-        }
-
         switch selectedProvider.rateUnit {
         case .day:
             return "today's budget"
@@ -1200,17 +1175,19 @@ final class UsageMonitorModel {
     private var codexWindowWarningLine: String? {
         guard
             isCodexAutoSource(provider: selectedProvider, mode: sourceMode),
-            let codexDetail
+            let codexDetail,
+            let remaining = codexDetail.primaryRemainingPercent,
+            let resetAt = codexDetail.primaryResetAt
         else {
             return nil
         }
 
-        if codexDetail.primaryRemainingPercent <= 0 {
-            return "The \(providerName) 5h window is exhausted until \(Formatters.timeOnly.string(from: codexDetail.primaryResetAt))."
+        if remaining <= 0 {
+            return "The \(providerName) 5h window is exhausted until \(Formatters.timeOnly.string(from: resetAt))."
         }
 
-        if codexDetail.primaryRemainingPercent <= 20 {
-            return "The \(providerName) 5h window has \(formattedNumber(codexDetail.primaryRemainingPercent))% left until \(Formatters.timeOnly.string(from: codexDetail.primaryResetAt))."
+        if remaining <= 20 {
+            return "The \(providerName) 5h window has \(formattedNumber(remaining))% left until \(Formatters.timeOnly.string(from: resetAt))."
         }
 
         return nil

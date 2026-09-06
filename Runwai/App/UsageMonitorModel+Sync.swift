@@ -3,13 +3,7 @@ import Foundation
 extension UsageMonitorModel {
     static func makeAutomaticSyncServices() -> [UsageSourceMode: any AutomaticUsageSyncing] {
         [
-            .codexApp: CodexQuotaSyncService(),
-            .codexSparkApp: CodexQuotaSyncService(
-                provider: .codexSpark,
-                sourceMode: .codexSparkApp,
-                additionalRateLimitName: "GPT-5.3-Codex-Spark"
-            ),
-            .geminiCLI: GeminiQuotaSyncService()
+            .codexApp: CodexQuotaSyncService()
         ]
     }
 

@@ -6,6 +6,10 @@ struct DailyBudgetBarView: View {
     let fillTint: Color
     let budgetTint: Color
     let trackTint: Color
+    let labelTint: Color
+    let markerTint: Color
+    let budgetLabel: String
+    let bufferLabel: String
     let isOverBudget: Bool
 
     var body: some View {
@@ -19,25 +23,15 @@ struct DailyBudgetBarView: View {
 
             VStack(alignment: .leading, spacing: isOverBudget ? 4 : 0) {
                 if isOverBudget {
-                    HStack {
-                        Text("today")
-                        Spacer()
-                        Text("tomorrow")
+                    HStack(spacing: 8) {
+                        Text(budgetLabel)
+                        Spacer(minLength: 0)
+                        Text("from \(bufferLabel)")
                     }
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .tracking(0.5)
-                    .foregroundStyle(Color.white.opacity(0.56))
-                    .padding(.horizontal, 2)
-
-                    let labelWidth: CGFloat = 42
-                    let labelOffset = max(min((proxy.size.width * clampedTarget) - (labelWidth / 2), proxy.size.width - labelWidth), 0)
-
-                    Text("limit")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .tracking(0.5)
-                        .foregroundStyle(Color.white.opacity(0.72))
-                        .frame(width: labelWidth, alignment: .center)
-                        .offset(x: labelOffset)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(labelTint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 }
 
                 ZStack(alignment: .leading) {
@@ -69,7 +63,7 @@ struct DailyBudgetBarView: View {
                         }
 
                         RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                            .fill(Color.white.opacity(0.78))
+                            .fill(markerTint)
                             .frame(width: 2, height: 20)
                             .offset(x: markerOffset, y: 0)
                     } else {
@@ -84,30 +78,7 @@ struct DailyBudgetBarView: View {
                             .frame(width: fillWidth)
                     }
                 }
-
-                if isOverBudget {
-                    HStack {
-                        Text("safe")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .tracking(0.5)
-                            .foregroundStyle(Color.white.opacity(0.62))
-
-                        Spacer()
-
-                        Text("borrowed")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .tracking(0.5)
-                            .foregroundStyle(fillTint.opacity(0.95))
-
-                        Spacer()
-
-                        Text("left")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .tracking(0.5)
-                            .foregroundStyle(Color.white.opacity(0.62))
-                    }
-                    .padding(.horizontal, 2)
-                }
+                .frame(height: 22)
             }
         }
     }
@@ -129,13 +100,12 @@ struct PaceBarView: View {
             let width = proxy.size.width
             let fillWidth = clampedActual == 0 ? 0 : max(width * clampedActual, 14)
             let markerOffset = max(min((width * clampedTarget) - 1, width - 2), 0)
-            let labelWidth: CGFloat = 42
+            let labelWidth: CGFloat = 60
             let labelOffset = max(min((width * clampedTarget) - (labelWidth / 2), width - labelWidth), 0)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("target")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .tracking(0.6)
+                Text("pace now")
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(markerTint)
                     .frame(width: labelWidth, alignment: .center)
                     .offset(x: labelOffset)
@@ -227,8 +197,8 @@ struct TrendSparklineView: View {
 
     private func guidePath(in rect: CGRect) -> Path {
         var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.move(to: CGPoint(x: rect.minX, y: yPosition(for: 100, height: rect.height)))
+        path.addLine(to: CGPoint(x: rect.maxX, y: yPosition(for: 0, height: rect.height)))
         return path
     }
 

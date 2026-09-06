@@ -2,62 +2,42 @@ import AppKit
 import SwiftUI
 
 extension MenuBarContentView {
-    var statusLine: some View {
-        HStack(spacing: 7) {
+    func overviewStatus(_ title: String, tint: Color) -> some View {
+        HStack(spacing: 5) {
             Circle()
-                .fill(model.isTodayOverBudget ? dailyTint : statusTint)
-                .frame(width: 7, height: 7)
+                .fill(tint)
+                .frame(width: 6, height: 6)
 
-            Text(model.overBudgetStatusLine.lowercased())
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(model.isTodayOverBudget ? dailyTint : statusTint)
+            Text(title.lowercased())
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(tint)
         }
     }
 
-    func metricBlock(
-        value: String,
-        label: String,
-        note: String,
-        alignment: HorizontalAlignment,
-        size: CGFloat,
-        tint: Color
+    func overviewMetrics(
+        primaryValue: String, primaryLabel: String,
+        secondaryValue: String, secondaryLabel: String
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            overviewMetric(primaryValue, label: primaryLabel, size: 40, alignment: .leading)
+            Spacer(minLength: 0)
+            overviewMetric(secondaryValue, label: secondaryLabel, size: 28, alignment: .trailing)
+        }
+    }
+
+    private func overviewMetric(
+        _ value: String, label: String, size: CGFloat, alignment: HorizontalAlignment
     ) -> some View {
         VStack(alignment: alignment, spacing: 4) {
             Text(value)
                 .font(.system(size: size, weight: .bold, design: .rounded))
+                .monospacedDigit()
                 .foregroundStyle(headerText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
 
             Text(label)
-                .font(.caption.weight(.semibold))
-                .tracking(0.7)
-                .foregroundStyle(subtleText)
-
-            if note.isEmpty == false {
-                Text(note)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(tint)
-            }
-        }
-    }
-
-    func compactMetricBlock(
-        value: String,
-        label: String,
-        alignment: HorizontalAlignment,
-        size: CGFloat
-    ) -> some View {
-        VStack(alignment: alignment, spacing: 0) {
-            Text(value)
-                .font(.system(size: size, weight: .bold, design: .rounded))
-                .foregroundStyle(headerText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .tracking(0.6)
+                .font(.caption.weight(.medium))
                 .foregroundStyle(subtleText)
         }
     }

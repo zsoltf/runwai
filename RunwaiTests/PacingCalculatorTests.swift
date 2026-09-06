@@ -519,6 +519,99 @@ struct PacingCalculatorTests {
 
     @MainActor
     @Test
+    func codexOnlyLaunchPreservesPreviousProviderData() {
+        let suite = "runwai.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ManualUsageStore(defaults: defaults)
+        let gemini = UsageSnapshot.sample(provider: .gemini, now: Date())
+        store.save(gemini, for: .gemini)
+        store.saveSelectedProvider(.gemini)
+        let model = UsageMonitorModel(store: store, automaticSyncServices: [:])
+        defer { model.refreshTimer?.invalidate() }
+
+        #expect(model.selectedProvider == .codex)
+        #expect(UsageProvider.visibleProviders == [.codex])
+        #expect(Set(UsageMonitorModel.makeAutomaticSyncServices().keys) == [.codexApp])
+        #expect(store.loadSnapshot(for: .gemini) == gemini)
+        #expect(model.formattedNumber(42 - 1e-12) == model.formattedNumber(42))
+    }
+
+    @MainActor
+    @Test
+    func optionalFiveHourWindowDoesNotOverrideWeeklyUsage() {
+        let suiteName = "runwai.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let model = UsageMonitorModel(
+            store: ManualUsageStore(defaults: defaults),
+            automaticSyncServices: [:]
+        )
+        defer { model.refreshTimer?.invalidate() }
+        let now = Date()
+        let weeklyReset = now.addingTimeInterval(6 * 86_400)
+
+        for provider in [UsageProvider.codex, .codexSpark] {
+            model.selectedProvider = provider
+            for shortRemaining: Double? in [nil, 10, 0, nil] {
+                model.applyAutomaticSyncPayload(AutomaticUsageSyncPayload(
+                    provider: provider,
+                    usageSnapshot: UsageSnapshot(
+                        weeklyBudgetUnits: 100, usedUnits: 49,
+                        windowDuration: 604_800, resetAt: weeklyReset, lastUpdatedAt: now
+                    ),
+                    detail: .codex(CodexAutoSyncDetail(
+                        planType: "pro", primaryRemainingPercent: shortRemaining,
+                        primaryResetAt: shortRemaining.map { _ in now.addingTimeInterval(3_600) },
+                        secondaryRemainingPercent: 51, secondaryResetAt: weeklyReset
+                    ))
+                ))
+
+                #expect(model.remainingPercentInput == 51)
+                #expect(model.resetAt == weeklyReset)
+                #expect(!model.hasSourceError)
+                if let shortRemaining {
+                    #expect(model.warningLine?.contains("5h window") == true)
+                    #expect(model.warningLine?.contains("exhausted") == (shortRemaining == 0))
+                } else {
+                    #expect(model.warningLine == nil)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    @Test
+    func midnightSnapshotIsTodaysBaseline() {
+        let suiteName = "runwai.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let now = Calendar.current.date(from: DateComponents(
+            year: 2026, month: 9, day: 6, hour: 12
+        ))!
+        let midnight = Calendar.current.startOfDay(for: now)
+        let store = ManualUsageStore(defaults: defaults)
+        store.saveHistory([
+            UsageHistoryPoint(timestamp: midnight.addingTimeInterval(-86_400), remainingPercent: 79),
+            UsageHistoryPoint(timestamp: midnight, remainingPercent: 62)
+        ], for: .codex)
+        store.save(UsageSnapshot(
+            weeklyBudgetUnits: 100, usedUnits: 47, windowDuration: 604_800,
+            resetAt: now.addingTimeInterval(4 * 86_400), lastUpdatedAt: now
+        ), for: .codex)
+        let model = UsageMonitorModel(store: store, automaticSyncServices: [:])
+        defer { model.refreshTimer?.invalidate() }
+        model.selectedProvider = .codex
+        model.now = now
+
+        #expect(model.todayConsumedPercent == 9)
+        #expect(!model.isTodayOverBudget)
+        #expect(model.overBudgetStatusLine == "Behind this week")
+        #expect(model.focusTargetLabel == "today's budget")
+    }
+
+    @MainActor
+    @Test
     func safeTodayCanStillBeBehindForWeek() {
         let suiteName = "runwai.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -559,7 +652,7 @@ struct PacingCalculatorTests {
         #expect(model.summary.status == .behind)
         #expect(model.reachesTargetAfterBoundary)
         #expect(model.overBudgetStatusLine == "Behind this week")
-        #expect(model.estimatedStopAtLabel == "safe today")
+        #expect(model.estimatedStopAtLabel == "today's budget")
         #expect(model.estimatedStopCountdownLine == "Safe today. Behind this week.")
     }
 }

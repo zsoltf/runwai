@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @main
@@ -7,7 +8,7 @@ struct RunwaiApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarContentView(model: model)
-                .frame(width: 420, height: 760, alignment: .topLeading)
+                .frame(width: 420, height: min(640, (NSScreen.main?.visibleFrame.height ?? 720) - 48), alignment: .topLeading)
         } label: {
             MenuBarLabelView(model: model)
         }

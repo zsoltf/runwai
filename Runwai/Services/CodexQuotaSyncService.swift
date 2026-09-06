@@ -3,9 +3,9 @@ import Foundation
 struct CodexQuotaSnapshot: Equatable {
     let capturedAt: Date
     let planType: String?
-    let primaryRemainingPercent: Double
-    let primaryResetAt: Date
-    let primaryWindowMinutes: Double
+    let primaryRemainingPercent: Double?
+    let primaryResetAt: Date?
+    let primaryWindowMinutes: Double?
     let secondaryRemainingPercent: Double
     let secondaryResetAt: Date
     let secondaryWindowMinutes: Double
@@ -157,18 +157,22 @@ struct CodexQuotaSyncService: AutomaticUsageSyncing {
 
         let usage = try JSONDecoder().decode(CodexUsageEnvelope.self, from: data)
         let selectedRateLimit = try selectedLiveRateLimit(from: usage)
-        let secondaryResetAt = Date(timeIntervalSince1970: selectedRateLimit.secondaryWindow.resetAt)
+        let windows = try CodexUsageWindows([
+            selectedRateLimit.primaryWindow?.rateLimitWindow,
+            selectedRateLimit.secondaryWindow?.rateLimitWindow
+        ])
+        let secondaryResetAt = Date(timeIntervalSince1970: windows.weekly.resetAt)
         let historyPoints = localHistoryPoints(from: localEvents, matchingSecondaryResetAt: secondaryResetAt)
 
         return CodexQuotaSnapshot(
             capturedAt: Date(),
             planType: usage.planType,
-            primaryRemainingPercent: (100 - selectedRateLimit.primaryWindow.usedPercent).clamped(to: 0...100),
-            primaryResetAt: Date(timeIntervalSince1970: selectedRateLimit.primaryWindow.resetAt),
-            primaryWindowMinutes: selectedRateLimit.primaryWindow.limitWindowSeconds / 60,
-            secondaryRemainingPercent: (100 - selectedRateLimit.secondaryWindow.usedPercent).clamped(to: 0...100),
+            primaryRemainingPercent: windows.fiveHour.map { (100 - $0.usedPercent).clamped(to: 0...100) },
+            primaryResetAt: windows.fiveHour.map { Date(timeIntervalSince1970: $0.resetAt) },
+            primaryWindowMinutes: windows.fiveHour?.windowMinutes,
+            secondaryRemainingPercent: (100 - windows.weekly.usedPercent).clamped(to: 0...100),
             secondaryResetAt: secondaryResetAt,
-            secondaryWindowMinutes: selectedRateLimit.secondaryWindow.limitWindowSeconds / 60,
+            secondaryWindowMinutes: windows.weekly.windowMinutes,
             historyPoints: historyPoints
         )
     }
@@ -295,22 +299,17 @@ struct CodexQuotaSyncService: AutomaticUsageSyncing {
 
         let selectedRateLimits = try selectedLoggedRateLimits(from: payload)
 
-        guard
-            let primary = selectedRateLimits.primary,
-            let secondary = selectedRateLimits.secondary
-        else {
-            throw CodexQuotaSyncError.invalidResponse
-        }
+        let windows = try CodexUsageWindows([selectedRateLimits.primary, selectedRateLimits.secondary])
 
         return ParsedCodexRateLimitEvent(
             capturedAt: Date(timeIntervalSince1970: timestamp),
             planType: payload.planType,
-            primaryRemainingPercent: (100 - primary.usedPercent).clamped(to: 0...100),
-            primaryResetAt: Date(timeIntervalSince1970: primary.resetAt),
-            primaryWindowMinutes: primary.windowMinutes,
-            secondaryRemainingPercent: (100 - secondary.usedPercent).clamped(to: 0...100),
-            secondaryResetAt: Date(timeIntervalSince1970: secondary.resetAt),
-            secondaryWindowMinutes: secondary.windowMinutes
+            primaryRemainingPercent: windows.fiveHour.map { (100 - $0.usedPercent).clamped(to: 0...100) },
+            primaryResetAt: windows.fiveHour.map { Date(timeIntervalSince1970: $0.resetAt) },
+            primaryWindowMinutes: windows.fiveHour?.windowMinutes,
+            secondaryRemainingPercent: (100 - windows.weekly.usedPercent).clamped(to: 0...100),
+            secondaryResetAt: Date(timeIntervalSince1970: windows.weekly.resetAt),
+            secondaryWindowMinutes: windows.weekly.windowMinutes
         )
     }
 
@@ -371,9 +370,9 @@ struct CodexQuotaSyncService: AutomaticUsageSyncing {
 private struct ParsedCodexRateLimitEvent: Equatable {
     let capturedAt: Date
     let planType: String?
-    let primaryRemainingPercent: Double
-    let primaryResetAt: Date
-    let primaryWindowMinutes: Double
+    let primaryRemainingPercent: Double?
+    let primaryResetAt: Date?
+    let primaryWindowMinutes: Double?
     let secondaryRemainingPercent: Double
     let secondaryResetAt: Date
     let secondaryWindowMinutes: Double
@@ -403,8 +402,8 @@ private struct CodexUsageEnvelope: Decodable {
     }
 
     struct RateLimit: Decodable {
-        let primaryWindow: Window
-        let secondaryWindow: Window
+        let primaryWindow: Window?
+        let secondaryWindow: Window?
 
         private enum CodingKeys: String, CodingKey {
             case primaryWindow = "primary_window"
@@ -416,6 +415,14 @@ private struct CodexUsageEnvelope: Decodable {
         let usedPercent: Double
         let limitWindowSeconds: Double
         let resetAt: TimeInterval
+
+        var rateLimitWindow: CodexRateLimitWindow {
+            CodexRateLimitWindow(
+                usedPercent: usedPercent,
+                windowMinutes: limitWindowSeconds / 60,
+                resetAt: resetAt
+            )
+        }
 
         private enum CodingKeys: String, CodingKey {
             case usedPercent = "used_percent"
@@ -463,6 +470,21 @@ private struct CodexRateLimitWindow: Decodable {
         case usedPercent = "used_percent"
         case windowMinutes = "window_minutes"
         case resetAt = "reset_at"
+    }
+}
+
+// Backend slots are positional: weekly usage moves to primary when 5h is absent.
+private struct CodexUsageWindows {
+    let fiveHour: CodexRateLimitWindow?
+    let weekly: CodexRateLimitWindow
+
+    init(_ candidates: [CodexRateLimitWindow?]) throws {
+        let windows = candidates.compactMap { $0 }
+        guard let weekly = windows.first(where: { $0.windowMinutes == 7 * 24 * 60 }) else {
+            throw CodexQuotaSyncError.invalidResponse
+        }
+        self.weekly = weekly
+        self.fiveHour = windows.first(where: { $0.windowMinutes == 5 * 60 })
     }
 }
 

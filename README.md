@@ -1,6 +1,6 @@
 # runwai
 
-runwai is a macOS menu bar app for codex, spark, and gemini usage runway.
+runwai is a macOS menu bar app for your Codex usage runway.
 
 It answers three things fast:
 
@@ -12,10 +12,12 @@ It answers three things fast:
 
 ## current build
 
-- codex and codex spark auto-refresh from your local Codex login
-- gemini auto-refresh from local Gemini CLI
+- Codex auto-refreshes from your local login, including weekly-only limits
 - daily pacing first, weekly runway second
+- Activity view with a larger usage chart, time ranges, and hover readouts
 - local-only data
+
+Charts track your remaining allowance, not raw token counts.
 
 ## install
 
