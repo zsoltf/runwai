@@ -55,10 +55,8 @@ struct UsageActivityView: View {
                         Image(systemName: "waveform.path")
                             .font(.system(size: 30, weight: .light))
                             .foregroundStyle(tint)
-                            .padding(.bottom, 6)
-                        Text(data.points.isEmpty ? "A fresh start" : "Learning your pace")
-                            .font(.system(size: 20, weight: .semibold, design: .rounded))
-                            .foregroundStyle(text)
+                            .accessibilityLabel("Collecting readings for your burn rate")
+                            .help("Collecting readings for your burn rate")
                     }
                 }
                 Spacer()
@@ -74,6 +72,7 @@ struct UsageActivityView: View {
                     }
                 }
             }
+            .frame(minHeight: 68)
 
             chart(data, reading: reading)
                 .frame(height: 250)
@@ -113,11 +112,6 @@ struct UsageActivityView: View {
                 }
             }
 
-            if data.pointsPerHour == nil {
-                Text(data.points.isEmpty ? "Your next readings will appear here." : "Collecting readings for your burn rate.")
-                    .font(.caption)
-                    .foregroundStyle(secondaryText)
-            }
         }
         .help("Hover over the chart to inspect recorded allowance. Percentages are not raw token counts.")
         .onChange(of: range) { selectedDate = nil }

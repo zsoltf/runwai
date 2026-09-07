@@ -99,27 +99,31 @@ struct MenuBarContentView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(providerTint(model.selectedProvider))
 
-                    Text("•")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(subtleText.opacity(0.62))
+                    if page == .usage {
+                        Text("•")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(subtleText.opacity(0.62))
 
-                    Text(page == .usage ? model.sourceStatusLine : activity.status)
-                        .font(.caption)
-                        .foregroundStyle(page == .usage ? sourceStatusText : subtleText)
+                        Text(model.sourceStatusLine)
+                            .font(.caption)
+                            .foregroundStyle(sourceStatusText)
+                    }
                 }
             }
 
             Spacer()
 
             HStack(spacing: 8) {
-                Text(page == .usage ? model.sourceBadgeText.lowercased() : activity.status)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(headerText)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background {
-                        badgeSurface(tint: Color(red: 0.35, green: 0.56, blue: 0.95).opacity(0.08))
-                    }
+                if page == .usage {
+                    Text(model.sourceBadgeText.lowercased())
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(headerText)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background {
+                            badgeSurface(tint: Color(red: 0.35, green: 0.56, blue: 0.95).opacity(0.08))
+                        }
+                }
 
                 if showsHeaderUtilities {
                     Button {

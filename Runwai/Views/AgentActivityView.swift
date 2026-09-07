@@ -33,8 +33,7 @@ struct AgentActivityView: View {
                 .menuIndicator(.visible)
                 .accessibilityLabel("Recent projects")
                 Spacer()
-                Text(model.status)
-                    .font(.caption).foregroundStyle(.secondary)
+                statusIndicator
             }
 
             if model.selectedRoot != nil {
@@ -71,7 +70,6 @@ struct AgentActivityView: View {
             } else if model.messages.isEmpty && !model.isLoading {
                 ContentUnavailableView(model.answerStatus == "known_absent" ? "No updates yet" : "No recent updates", systemImage: "text.bubble")
             }
-            if model.isLoading { ProgressView().controlSize(.small) }
 
             if let answer = model.latestAnswer {
                 messageRow(answer, latest: true)
@@ -95,6 +93,32 @@ struct AgentActivityView: View {
         }
         .onChange(of: model.generation) { expanded = [] }
         .onChange(of: model.revision) { expanded = [] }
+    }
+
+    private var statusIndicator: some View {
+        let status = model.isLoadingOlder ? "loading earlier updates" : model.status
+        let busy = model.isLoading || model.isLoadingOlder || status == "summarizing"
+        let symbol: String = switch status {
+        case "offline": "wifi.slash"
+        case "paused": "pause.circle"
+        case "originals": "doc.text"
+        case "unavailable": "exclamationmark.triangle"
+        case "choose project": "folder"
+        default: "checkmark.circle"
+        }
+        return ZStack {
+            if busy {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 24, height: 24)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(status)
+        .help(status)
     }
 
     private func messageRow(_ message: LowdownMessage, latest: Bool = false) -> some View {
