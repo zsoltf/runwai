@@ -81,6 +81,8 @@ struct SettingsView: View {
                 LabeledContent("Remaining") {
                     HStack(spacing: 12) {
                         TextField("90", value: $model.remainingPercentInput, format: .number.precision(.fractionLength(0...1)))
+                            .labelsHidden()
+                            .accessibilityLabel("Remaining percentage")
                             .multilineTextAlignment(.trailing)
                             .frame(width: 120)
 
