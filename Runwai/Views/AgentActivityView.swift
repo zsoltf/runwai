@@ -71,10 +71,10 @@ struct AgentActivityView: View {
                 ContentUnavailableView(model.answerStatus == "known_absent" ? "No updates yet" : "No recent updates", systemImage: "text.bubble")
             }
 
-            if let answer = model.latestAnswer {
-                messageRow(answer, latest: true)
-            }
-            LazyVStack(alignment: .leading, spacing: 10) {
+            LazyVStack(alignment: .leading, spacing: 6) {
+                if let answer = model.latestAnswer {
+                    messageRow(answer, latest: true)
+                }
                 ForEach(model.messages.reversed().filter { $0.id != model.latestAnswer?.id }) { message in
                     messageRow(message)
                 }
@@ -172,7 +172,8 @@ struct AgentActivityView: View {
                 .font(.caption2)
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, isExpanded ? 12 : 10)
         .background(tint.opacity(isFinal ? 0.10 : 0.045), in: RoundedRectangle(cornerRadius: 14))
     }
 
