@@ -2,13 +2,26 @@
 
 runwai keeps Codex usage and project updates in your macOS menu bar.
 
+<table>
+  <tr>
+    <th>Day</th>
+    <th>Full window</th>
+    <th>Historical</th>
+    <th>Activity</th>
+  </tr>
+  <tr>
+    <td><a href="docs/assets/runwai-day.png"><img src="docs/assets/runwai-day.png" alt="Day chart showing average burn rate and remaining allowance" width="180" /></a></td>
+    <td><a href="docs/assets/runwai-full-window.png"><img src="docs/assets/runwai-full-window.png" alt="Full-window usage chart with an even-pace reference" width="180" /></a></td>
+    <td><a href="docs/assets/runwai-historical.png"><img src="docs/assets/runwai-historical.png" alt="Historical usage chart showing active periods, breaks, and resets" width="180" /></a></td>
+    <td><a href="docs/assets/runwai-activity.png"><img src="docs/assets/runwai-activity.png" alt="Activity view with summarized project updates" width="180" /></a></td>
+  </tr>
+</table>
+
 It answers three things fast:
 
 - how fast am i burning through my allowance?
 - how has that changed today and this week?
 - what is my agent working on?
-
-<img src="docs/assets/runwai-codex.png" alt="runwai daily burn-rate chart with example readings" width="420" />
 
 ## development build
 
