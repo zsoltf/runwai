@@ -25,6 +25,10 @@ targets:
     platform: macOS
     sources:
       - path: Runwai
+    postBuildScripts:
+      - name: Embed pinned Lowdown helper
+        script: bash "$SRCROOT/scripts/embed_lowdown.sh"
+        basedOnDependencyAnalysis: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.runwai

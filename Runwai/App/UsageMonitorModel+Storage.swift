@@ -38,7 +38,6 @@ extension UsageMonitorModel {
             lastUpdatedAt: referenceNow
         )
         isPlaceholderSnapshot = false
-        history = []
         now = referenceNow
         persistCurrentState(recordHistory: true)
     }

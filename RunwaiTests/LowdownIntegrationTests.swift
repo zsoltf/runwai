@@ -1,0 +1,168 @@
+import CryptoKit
+import Foundation
+import Testing
+import Darwin
+@testable import runwai
+
+// Runs the exact helper embedded in the test host. CI without a prepared
+// helper skips this composition check, not the transport/model regressions.
+@MainActor
+struct LowdownIntegrationTests {
+    @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
+    func bundledHelperFollowsProjectsAndPreservesOriginalsWithoutCodex() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let alpha = try fixture.session(project: "alpha", name: "first", count: 40)
+        let beta = try fixture.session(project: "beta", name: "second", count: 2)
+        let model = AgentActivityModel(defaults: fixture.defaults,
+            executable: try #require(LowdownBridge.bundledExecutable), environment: fixture.environment)
+        defer { model.shutdown() }
+        model.show()
+        try await wait { model.projects.count == 2 }
+        let alias = fixture.directory.appendingPathComponent("alpha-alias")
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: alpha.root)
+        model.selectProject(alias.path)
+        try await wait { model.hasActiveSelection && !model.summaries.isEmpty }
+        #expect(model.selectedRoot == alpha.root.path)
+        #expect(model.messages.count == 31)
+        #expect(model.latestAnswer?.originalText == "Complete answer for first")
+        #expect(model.summaries.values.contains("Cached first update"))
+        #expect(model.hasMore)
+        model.loadOlder()
+        try await wait { !model.isLoadingOlder }
+        #expect(model.messages.count == 41)
+
+        try await wait { !model.sessions.isEmpty }
+        let sessionID = try #require(model.sessions.first?.id)
+        model.selectSession(sessionID)
+        try await wait { model.hasActiveSelection && !model.isLoading }
+        model.reconnect()
+        try await wait { model.hasActiveSelection && !model.summaries.isEmpty }
+        #expect(model.selectedSession == sessionID)
+        #expect(model.latestAnswer?.originalText == "Complete answer for first")
+
+        model.selectProject(beta.root.path)
+        try await wait { model.latestAnswer?.originalText == "Complete answer for second" }
+        let third = try fixture.session(project: "beta", name: "third", count: 1)
+        try await wait(timeout: .seconds(35)) { model.sessions.count == 2 }
+        #expect(model.latestAnswer?.originalText == "Complete answer for second")
+        let newSession = try #require(model.sessions.first { $0.path == third.path.path })
+        model.selectSession(newSession.id)
+        try await wait { model.latestAnswer?.originalText == "Complete answer for third" }
+        model.selectProject(alpha.root.path)
+        #expect(model.latestAnswer?.originalText == "Complete answer for first")
+        try await wait { model.hasActiveSelection }
+        try fixture.append("A live arrival", to: alpha.path)
+        try await wait { model.messages.contains { $0.originalText == "A live arrival" } }
+        try await wait { model.summaryStatus == "unavailable" || model.summaryStatus == "error" }
+        #expect(model.summaries.values.contains("Cached first update"))
+
+        let original = String(repeating: "Full UTF-8 original \u{1F680}\n", count: 60_000)
+        try fixture.append(original, to: alpha.path, final: true)
+        try await wait { model.latestAnswer?.textBytes == original.utf8.count }
+        let answer = try #require(model.latestAnswer)
+        #expect(answer.originalText == nil)
+        model.loadOriginal(answer)
+        try await wait { model.originalFiles[answer.id] != nil }
+        let file = try #require(model.originalFiles[answer.id])
+        #expect(try String(contentsOf: file, encoding: .utf8) == original)
+
+        model.hide()
+        try await wait { model.isPaused }
+        model.show()
+        try await wait { !model.isPaused }
+        let revision = model.revision
+        try fixture.rewrite(alpha.path, root: alpha.root)
+        try await wait { model.revision != revision && model.hasActiveSelection }
+        #expect(model.messages.count == 1)
+        #expect(model.messages.first?.originalText == "After reset")
+        #expect(model.originalFiles.isEmpty)
+        model.shutdown()
+        try await Task.sleep(for: .milliseconds(200))
+    }
+
+    private func wait(timeout: Duration = .seconds(8), _ predicate: () -> Bool) async throws {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while !predicate(), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        try #require(predicate(), "Timed out waiting for the bundled helper")
+    }
+
+    private final class Fixture {
+        let directory: URL
+        let defaults: UserDefaults
+        let suite = "runwai.integration.\(UUID().uuidString)"
+        let stamp = "2026-09-06T18:00:00Z"
+
+        init() throws {
+            let base = FileManager.default.temporaryDirectory
+            let canonical = realpath(base.path, nil)!
+            defer { free(canonical) }
+            directory = URL(fileURLWithPath: String(cString: canonical)).appendingPathComponent(UUID().uuidString)
+            defaults = UserDefaults(suiteName: suite)!
+            try FileManager.default.createDirectory(at: directory.appendingPathComponent("codex/sessions"), withIntermediateDirectories: true)
+        }
+
+        var environment: [String: String] {
+            var env = ProcessInfo.processInfo.environment.filter { !$0.key.hasPrefix("LOWDOWN_") }
+            env["CODEX_HOME"] = directory.appendingPathComponent("codex").path
+            env["LOWDOWN_CACHE_DIR"] = directory.appendingPathComponent("cache").path
+            env["LOWDOWN_CODEX_BIN"] = directory.appendingPathComponent("missing-codex").path
+            env["LOWDOWN_SUMMARY_CODEX_MODEL"] = "gpt-5.6-luna"
+            env["LOWDOWN_SUMMARY_CODEX_REASONING_EFFORT"] = "none"
+            return env
+        }
+
+        func session(project: String, name: String, count: Int) throws -> (root: URL, path: URL) {
+            let root = directory.appendingPathComponent(project)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let path = directory.appendingPathComponent("codex/sessions/rollout-\(name).jsonl")
+            try record(["type": "session_meta", "payload": ["id": name, "cwd": root.path]]).write(to: path)
+            var entries: [String: Any] = [:]
+            let milliseconds = Int64(ISO8601DateFormatter().date(from: stamp)!.timeIntervalSince1970 * 1000)
+            for index in 0..<count {
+                let text = "\(name) update \(index)"
+                try append(text, to: path)
+                entries["\(milliseconds):\(hash(text))"] = [
+                    "summary_version": "rust-codex-scanline-v2:gpt-5.6-luna:none",
+                    "summary": "Cached \(name) update", "source": "codex_exec"]
+            }
+            try append("Complete answer for \(name)", to: path, final: true)
+            let cache = directory.appendingPathComponent("cache/summaries")
+            try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+            try JSONSerialization.data(withJSONObject: ["schema_version": 1, "session_path": path.path, "entries": entries])
+                .write(to: cache.appendingPathComponent("\(hash(path.path)).json"))
+            return (root, path)
+        }
+
+        func append(_ text: String, to path: URL, final: Bool = false) throws {
+            let handle = try FileHandle(forWritingTo: path)
+            defer { try? handle.close() }
+            try handle.seekToEnd()
+            try handle.write(contentsOf: record(["type": "event_msg", "timestamp": stamp,
+                "payload": ["type": "agent_message", "phase": final ? "final_answer" : "commentary", "message": text]]))
+        }
+
+        func rewrite(_ path: URL, root: URL) throws {
+            try record(["type": "session_meta", "payload": ["id": "replacement", "cwd": root.path]])
+                .write(to: path, options: .atomic)
+            try append("After reset", to: path)
+        }
+
+        private func record(_ value: [String: Any]) throws -> Data {
+            var data = try JSONSerialization.data(withJSONObject: value)
+            data.append(10)
+            return data
+        }
+
+        private func hash(_ text: String) -> String {
+            Insecure.SHA1.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+        }
+
+        func cleanUp() {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: directory)
+        }
+    }
+}

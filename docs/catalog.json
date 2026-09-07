@@ -2,6 +2,18 @@
   "version": 1,
   "docs": [
     {
+      "path": "docs/product/lowdown-integration.md",
+      "summary": "Chart-first Usage and independent Lowdown Activity architecture and acceptance.",
+      "read_when": ["changing Usage/Activity boundaries or the Lowdown integration"],
+      "status": "optional"
+    },
+    {
+      "path": "docs/ops/lowdown-helper.md",
+      "summary": "Pinned Lowdown helper preparation, bundling, and runtime behavior.",
+      "read_when": ["building or signing Runwai with Activity support"],
+      "status": "optional"
+    },
+    {
       "path": "docs/index.md",
       "summary": "Broader docs map for workflow, runtime-state, and host-runtime references after the main entrypoint.",
       "read_when": [

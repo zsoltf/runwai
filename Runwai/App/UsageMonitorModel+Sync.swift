@@ -71,8 +71,15 @@ extension UsageMonitorModel {
         automaticRefreshPausedUntilByProvider[payload.provider] = nil
 
         if let historyPoints = payload.historyPoints, historyPoints.isEmpty == false {
-            historiesByProvider[payload.provider] = normalizeImportedHistory(historyPoints)
-            persistState(for: payload.provider, recordHistory: false)
+            let imported = normalizeImportedHistory(historyPoints, resetAt: payload.usageSnapshot.resetAt)
+            // Imports cover only the current window; retain older locally recorded windows.
+            var byTime = Dictionary((historiesByProvider[payload.provider] ?? []).map { ($0.timestamp, $0) },
+                                    uniquingKeysWith: { _, newest in newest })
+            for point in imported where byTime[point.timestamp] == nil {
+                byTime[point.timestamp] = point
+            }
+            historiesByProvider[payload.provider] = Array(byTime.values)
+            persistState(for: payload.provider, recordHistory: true)
         } else {
             persistState(for: payload.provider, recordHistory: true)
         }

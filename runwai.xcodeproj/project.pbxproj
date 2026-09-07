@@ -10,10 +10,12 @@
 		00AF4DADA8CD26E80867AA3A /* GlassAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F794BB1960188E5DE605029 /* GlassAppearance.swift */; };
 		04E19B0482D94FF99C10BA08 /* UsageSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = C44F1C6A5EA088A65122074F /* UsageSnapshot.swift */; };
 		05D027FDD034DC981B64609A /* UsageSourceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3F230A310AABEF8BB88841F /* UsageSourceMode.swift */; };
+		1144C74E6FCD816C8B7A8D2B /* AgentActivityModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728B91F42D015B34FB2248CA /* AgentActivityModel.swift */; };
 		23B918D6676329B140F7DEFB /* UsageActivitySeries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CB255A3BD3A267552036BF3 /* UsageActivitySeries.swift */; };
 		2CC30C992B2715093EB3D6FE /* UsageActivitySeriesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89750543B58B0A79FD0C04C8 /* UsageActivitySeriesTests.swift */; };
 		344EFAC9A3CC2439913BA957 /* AutomaticUsageSyncing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A05E926BAFB55D90F72C8CE2 /* AutomaticUsageSyncing.swift */; };
 		3BC87CC3F8B379534A12B850 /* RunwaiFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF2F6945139673B314F4DB8B /* RunwaiFormatters.swift */; };
+		43FB9D84539A0DC910AE733B /* AgentActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 560DB72331FB15A76BB4E034 /* AgentActivityView.swift */; };
 		44D0AF293725957BD35B4273 /* MenuBarContentView+Style.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67D50F2FB47D6039A6588632 /* MenuBarContentView+Style.swift */; };
 		476AFDEF56070231E4A09BB1 /* UsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55F1FA7318E50867E68F5EA0 /* UsageProvider.swift */; };
 		4AF3A22D008AC8119365BC43 /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E698E4E3EB477EF248A5B47C /* MenuBarContentView.swift */; };
@@ -21,18 +23,23 @@
 		57CF5BA373E6E628BB1E0761 /* ManualUsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64D090FF1D66CA4CCCCF7958 /* ManualUsageStore.swift */; };
 		591DF9F404379A3F1642C9DB /* UsageMonitorModel+Tracking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BE1490B77C63CD50099948A /* UsageMonitorModel+Tracking.swift */; };
 		5A167B8F33BE93C1D4E5527E /* CodexQuotaSyncServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A83EC89F19A53F63E438576 /* CodexQuotaSyncServiceTests.swift */; };
+		5D90B1B3F6B7574273A5B807 /* Lowdown-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 8850E819223BCB170468AE34 /* Lowdown-LICENSE.txt */; };
 		6C80D80B730EEDB860936AFF /* UsageHistoryPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43B02C6524D122FCF0899CE /* UsageHistoryPoint.swift */; };
 		7AF27707804245ED7D381023 /* RunwaiPacingBars.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276A4C9DD6AC60FC983E64BB /* RunwaiPacingBars.swift */; };
 		8C929E7172D2B5DE469F34C8 /* HeroStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B966FCBA97F5C985535DF93A /* HeroStyle.swift */; };
 		9B17D52229EC89AE7EF21322 /* gemini_quota_snapshot.mjs in Resources */ = {isa = PBXBuildFile; fileRef = B86EA1AAAA3A0E704FF2564D /* gemini_quota_snapshot.mjs */; };
 		9B95849D1EA8A65AC2A7A642 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F0991F09ED7FC5535B24EB44 /* Assets.xcassets */; };
+		9BBCB2C5E31851A52D4D8779 /* LowdownIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEBAB5CFCEC01F054F2517B1 /* LowdownIntegrationTests.swift */; };
 		AF003F8006CD03AF2FB5EDDC /* UsageMonitorModel+Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93BA3061A6E6E23799E456E7 /* UsageMonitorModel+Storage.swift */; };
 		BC89160B5D70560FAAE4D663 /* UsageMonitorModel+Sync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C79A021ED80F9E8EF46BB39 /* UsageMonitorModel+Sync.swift */; };
 		C1C56995D64A566A5C622FD2 /* PacingCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C1943C1AB9962FE71A97E3 /* PacingCalculatorTests.swift */; };
 		CD8C9255E9F6272EBC25B64C /* GeminiQuotaSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3E6EE7F7889C801C9EEB1C2 /* GeminiQuotaSyncService.swift */; };
+		CE29EBEE336EB9F22D8E80CD /* LowdownOriginalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE6A723FC565855039C3A0A1 /* LowdownOriginalStore.swift */; };
 		E098635EE8A080E9258EE495 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A078921603A98AF116199F /* SettingsView.swift */; };
+		E38CFD988E991747E179E168 /* AgentActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28619F526FEABE88ACD7B910 /* AgentActivityTests.swift */; };
 		E3CAB10E91B4DA94D4EC6769 /* PacingCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F36871D3E1128EF7188B65D0 /* PacingCalculator.swift */; };
 		E61242CE0421C8596FC34EBC /* CodexQuotaSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95D5896B42A3C7391B6794A /* CodexQuotaSyncService.swift */; };
+		F2A1ECD8058444417B1A0D15 /* LowdownBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE623F9248B7DA1A2B92C409 /* LowdownBridge.swift */; };
 		F44325DB910A7EF08F16504F /* UsageActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE9BA4735576FB21DA08353 /* UsageActivityView.swift */; };
 		F9953428C55B6692AFC7320A /* UsageMonitorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CC7E9AC58AE6C3BDBAF6187 /* UsageMonitorModel.swift */; };
 		FD917A8A01609AC2D2E6FC03 /* MenuBarLabelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D8BD662762438F541C56D3 /* MenuBarLabelView.swift */; };
@@ -53,15 +60,19 @@
 		0F794BB1960188E5DE605029 /* GlassAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassAppearance.swift; sourceTree = "<group>"; };
 		19D8BD662762438F541C56D3 /* MenuBarLabelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarLabelView.swift; sourceTree = "<group>"; };
 		276A4C9DD6AC60FC983E64BB /* RunwaiPacingBars.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunwaiPacingBars.swift; sourceTree = "<group>"; };
+		28619F526FEABE88ACD7B910 /* AgentActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentActivityTests.swift; sourceTree = "<group>"; };
 		4CB255A3BD3A267552036BF3 /* UsageActivitySeries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageActivitySeries.swift; sourceTree = "<group>"; };
 		55F1FA7318E50867E68F5EA0 /* UsageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageProvider.swift; sourceTree = "<group>"; };
+		560DB72331FB15A76BB4E034 /* AgentActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentActivityView.swift; sourceTree = "<group>"; };
 		5BE1490B77C63CD50099948A /* UsageMonitorModel+Tracking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UsageMonitorModel+Tracking.swift"; sourceTree = "<group>"; };
 		64D090FF1D66CA4CCCCF7958 /* ManualUsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualUsageStore.swift; sourceTree = "<group>"; };
 		67D50F2FB47D6039A6588632 /* MenuBarContentView+Style.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarContentView+Style.swift"; sourceTree = "<group>"; };
 		6CC7E9AC58AE6C3BDBAF6187 /* UsageMonitorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMonitorModel.swift; sourceTree = "<group>"; };
 		6E9D303591F968D8B4C5184B /* RunwaiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunwaiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		728B91F42D015B34FB2248CA /* AgentActivityModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentActivityModel.swift; sourceTree = "<group>"; };
 		7A83EC89F19A53F63E438576 /* CodexQuotaSyncServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexQuotaSyncServiceTests.swift; sourceTree = "<group>"; };
 		7EE9BA4735576FB21DA08353 /* UsageActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageActivityView.swift; sourceTree = "<group>"; };
+		8850E819223BCB170468AE34 /* Lowdown-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Lowdown-LICENSE.txt"; sourceTree = "<group>"; };
 		89750543B58B0A79FD0C04C8 /* UsageActivitySeriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageActivitySeriesTests.swift; sourceTree = "<group>"; };
 		93BA3061A6E6E23799E456E7 /* UsageMonitorModel+Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UsageMonitorModel+Storage.swift"; sourceTree = "<group>"; };
 		9C79A021ED80F9E8EF46BB39 /* UsageMonitorModel+Sync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UsageMonitorModel+Sync.swift"; sourceTree = "<group>"; };
@@ -72,7 +83,9 @@
 		B86EA1AAAA3A0E704FF2564D /* gemini_quota_snapshot.mjs */ = {isa = PBXFileReference; path = gemini_quota_snapshot.mjs; sourceTree = "<group>"; };
 		B95D5896B42A3C7391B6794A /* CodexQuotaSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexQuotaSyncService.swift; sourceTree = "<group>"; };
 		B966FCBA97F5C985535DF93A /* HeroStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroStyle.swift; sourceTree = "<group>"; };
+		BEBAB5CFCEC01F054F2517B1 /* LowdownIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowdownIntegrationTests.swift; sourceTree = "<group>"; };
 		C44F1C6A5EA088A65122074F /* UsageSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageSnapshot.swift; sourceTree = "<group>"; };
+		CE623F9248B7DA1A2B92C409 /* LowdownBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowdownBridge.swift; sourceTree = "<group>"; };
 		CE6604722037A87DE52C5D06 /* RunwaiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunwaiApp.swift; sourceTree = "<group>"; };
 		DF2F6945139673B314F4DB8B /* RunwaiFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunwaiFormatters.swift; sourceTree = "<group>"; };
 		E698E4E3EB477EF248A5B47C /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
@@ -80,13 +93,16 @@
 		F36871D3E1128EF7188B65D0 /* PacingCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacingCalculator.swift; sourceTree = "<group>"; };
 		F3F230A310AABEF8BB88841F /* UsageSourceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageSourceMode.swift; sourceTree = "<group>"; };
 		F43B02C6524D122FCF0899CE /* UsageHistoryPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageHistoryPoint.swift; sourceTree = "<group>"; };
+		FE6A723FC565855039C3A0A1 /* LowdownOriginalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LowdownOriginalStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		40179E4ADAF3A90CE563C8C2 /* RunwaiTests */ = {
 			isa = PBXGroup;
 			children = (
+				28619F526FEABE88ACD7B910 /* AgentActivityTests.swift */,
 				7A83EC89F19A53F63E438576 /* CodexQuotaSyncServiceTests.swift */,
+				BEBAB5CFCEC01F054F2517B1 /* LowdownIntegrationTests.swift */,
 				A6C1943C1AB9962FE71A97E3 /* PacingCalculatorTests.swift */,
 				89750543B58B0A79FD0C04C8 /* UsageActivitySeriesTests.swift */,
 			);
@@ -97,6 +113,7 @@
 			isa = PBXGroup;
 			children = (
 				F0991F09ED7FC5535B24EB44 /* Assets.xcassets */,
+				8850E819223BCB170468AE34 /* Lowdown-LICENSE.txt */,
 				8A2CF4CC97CC50CF687DB29B /* Scripts */,
 			);
 			path = Resources;
@@ -137,6 +154,7 @@
 		94C47AC3E5E57BC4297AC974 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				728B91F42D015B34FB2248CA /* AgentActivityModel.swift */,
 				CE6604722037A87DE52C5D06 /* RunwaiApp.swift */,
 				6CC7E9AC58AE6C3BDBAF6187 /* UsageMonitorModel.swift */,
 				93BA3061A6E6E23799E456E7 /* UsageMonitorModel+Storage.swift */,
@@ -149,6 +167,7 @@
 		E3DD66E09B397E343F91F820 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				560DB72331FB15A76BB4E034 /* AgentActivityView.swift */,
 				E698E4E3EB477EF248A5B47C /* MenuBarContentView.swift */,
 				67D50F2FB47D6039A6588632 /* MenuBarContentView+Style.swift */,
 				19D8BD662762438F541C56D3 /* MenuBarLabelView.swift */,
@@ -165,6 +184,8 @@
 				A05E926BAFB55D90F72C8CE2 /* AutomaticUsageSyncing.swift */,
 				B95D5896B42A3C7391B6794A /* CodexQuotaSyncService.swift */,
 				B3E6EE7F7889C801C9EEB1C2 /* GeminiQuotaSyncService.swift */,
+				CE623F9248B7DA1A2B92C409 /* LowdownBridge.swift */,
+				FE6A723FC565855039C3A0A1 /* LowdownOriginalStore.swift */,
 				64D090FF1D66CA4CCCCF7958 /* ManualUsageStore.swift */,
 				F36871D3E1128EF7188B65D0 /* PacingCalculator.swift */,
 			);
@@ -201,6 +222,7 @@
 			buildPhases = (
 				6B09F84C617456F455439591 /* Sources */,
 				4F321AFF431905288954C40C /* Resources */,
+				55238238A99193450787F0B5 /* Embed pinned Lowdown helper */,
 			);
 			buildRules = (
 			);
@@ -268,22 +290,49 @@
 			buildActionMask = 2147483647;
 			files = (
 				9B95849D1EA8A65AC2A7A642 /* Assets.xcassets in Resources */,
+				5D90B1B3F6B7574273A5B807 /* Lowdown-LICENSE.txt in Resources */,
 				9B17D52229EC89AE7EF21322 /* gemini_quota_snapshot.mjs in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		55238238A99193450787F0B5 /* Embed pinned Lowdown helper */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed pinned Lowdown helper";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "bash \"$SRCROOT/scripts/embed_lowdown.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		6B09F84C617456F455439591 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1144C74E6FCD816C8B7A8D2B /* AgentActivityModel.swift in Sources */,
+				43FB9D84539A0DC910AE733B /* AgentActivityView.swift in Sources */,
 				344EFAC9A3CC2439913BA957 /* AutomaticUsageSyncing.swift in Sources */,
 				E61242CE0421C8596FC34EBC /* CodexQuotaSyncService.swift in Sources */,
 				CD8C9255E9F6272EBC25B64C /* GeminiQuotaSyncService.swift in Sources */,
 				00AF4DADA8CD26E80867AA3A /* GlassAppearance.swift in Sources */,
 				8C929E7172D2B5DE469F34C8 /* HeroStyle.swift in Sources */,
+				F2A1ECD8058444417B1A0D15 /* LowdownBridge.swift in Sources */,
+				CE29EBEE336EB9F22D8E80CD /* LowdownOriginalStore.swift in Sources */,
 				57CF5BA373E6E628BB1E0761 /* ManualUsageStore.swift in Sources */,
 				44D0AF293725957BD35B4273 /* MenuBarContentView+Style.swift in Sources */,
 				4AF3A22D008AC8119365BC43 /* MenuBarContentView.swift in Sources */,
@@ -310,7 +359,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E38CFD988E991747E179E168 /* AgentActivityTests.swift in Sources */,
 				5A167B8F33BE93C1D4E5527E /* CodexQuotaSyncServiceTests.swift in Sources */,
+				9BBCB2C5E31851A52D4D8779 /* LowdownIntegrationTests.swift in Sources */,
 				C1C56995D64A566A5C622FD2 /* PacingCalculatorTests.swift in Sources */,
 				2CC30C992B2715093EB3D6FE /* UsageActivitySeriesTests.swift in Sources */,
 			);

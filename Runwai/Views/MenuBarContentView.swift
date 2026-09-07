@@ -7,87 +7,76 @@ struct MenuBarContentView: View {
     @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     @Environment(\.colorScheme) var colorScheme
     @Bindable var model: UsageMonitorModel
+    @Bindable var activity: AgentActivityModel
     let showsHeaderUtilities: Bool
+    let initialUsageRange: UsageActivityRange
     @State private var showsQuickUpdate = false
-    @State private var selectedPage: DashboardPage
+    @State private var page: Page = .usage
 
-    enum DashboardPage: String, CaseIterable {
-        case overview = "Overview"
-        case activity = "Activity"
-    }
+    enum Page: String, CaseIterable { case usage = "Usage", activity = "Activity" }
 
-    init(model: UsageMonitorModel, showsHeaderUtilities: Bool = true, initialPage: DashboardPage = .overview) {
+    init(model: UsageMonitorModel, activity: AgentActivityModel = AgentActivityModel(), showsHeaderUtilities: Bool = true,
+         initialUsageRange: UsageActivityRange = .today) {
         self.model = model
+        self.activity = activity
         self.showsHeaderUtilities = showsHeaderUtilities
-        _selectedPage = State(initialValue: initialPage)
+        self.initialUsageRange = initialUsageRange
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 10) {
-                header
-                pageTabs
-                issueBanners
-                if model.isPlaceholderSnapshot {
-                    setupSection
-                } else {
-                    if selectedPage == .overview {
-                        focusSection
-                        weeklySection
+        VStack(spacing: 10) {
+            header.padding(.horizontal, 14).padding(.top, 14)
+            HStack(spacing: 20) {
+                ForEach(Page.allCases, id: \.self) { value in
+                    Button { page = value } label: {
+                        VStack(spacing: 6) {
+                            Text(value.rawValue.lowercased()).font(.caption.weight(.semibold))
+                            Capsule().fill(page == value ? providerTint(.codex) : .clear).frame(height: 2)
+                        }
+                        .foregroundStyle(page == value ? headerText : subtleText)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(page == value ? .isSelected : [])
+                }
+            }
+            .padding(.horizontal, 14)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 10) {
+                    if page == .activity {
+                        AgentActivityView(model: activity, tint: providerTint(.codex))
                     } else {
-                        activitySection
-                    }
-
-                    if showsQuickUpdate {
-                        quickUpdateSection
+                        issueBanners
+                        if model.isPlaceholderSnapshot {
+                            setupSection
+                        } else {
+                            usageSection
+                            if showsQuickUpdate { quickUpdateSection }
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 14)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .background {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(popoverFillStyle)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .fill(popoverGlow)
-                }
+        .background(popoverFillStyle)
+        .overlay { popoverGlow.allowsHitTesting(false) }
+        .onChange(of: page) {
+            if page == .activity { activity.show() } else { activity.hide() }
         }
-        .shadow(color: Color.black.opacity(shellShadowOpacity), radius: 22, y: 12)
-        .padding(10)
+        .onAppear { if page == .activity { activity.show() } }
+        .onDisappear { activity.hide() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            activity.shutdown()
+        }
     }
 
-    private var pageTabs: some View {
-        HStack(spacing: 22) {
-            ForEach(DashboardPage.allCases, id: \.self) { page in
-                Button {
-                    selectedPage = page
-                } label: {
-                    VStack(spacing: 5) {
-                        Label(page.rawValue.lowercased(), systemImage: page == .overview ? "rectangle.grid.1x2" : "waveform.path")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(selectedPage == page ? headerText : subtleText)
-                        Capsule()
-                            .fill(selectedPage == page ? providerTint(model.selectedProvider) : .clear)
-                            .frame(height: 2)
-                    }
-                    .padding(.top, 4)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selectedPage == page ? .isSelected : [])
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 4)
-    }
-
-    private var activitySection: some View {
+    private var usageSection: some View {
         UsageActivityView(
             model: model, tint: providerTint(model.selectedProvider),
-            text: headerText, secondaryText: subtleText
+            text: headerText, secondaryText: subtleText, initialRange: initialUsageRange
         )
         .padding(14)
         .background {
@@ -103,7 +92,7 @@ struct MenuBarContentView: View {
                     .foregroundStyle(headerText)
 
                 HStack(spacing: 6) {
-                    Text(model.selectedProvider.shortName)
+                    Text(page == .usage ? model.selectedProvider.shortName : "lowdown")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(providerTint(model.selectedProvider))
 
@@ -111,16 +100,16 @@ struct MenuBarContentView: View {
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(subtleText.opacity(0.62))
 
-                    Text(model.sourceStatusLine)
+                    Text(page == .usage ? model.sourceStatusLine : activity.status)
                         .font(.caption)
-                        .foregroundStyle(sourceStatusText)
+                        .foregroundStyle(page == .usage ? sourceStatusText : subtleText)
                 }
             }
 
             Spacer()
 
             HStack(spacing: 8) {
-                Text(model.sourceBadgeText.lowercased())
+                Text(page == .usage ? model.sourceBadgeText.lowercased() : activity.status)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(headerText)
                     .padding(.horizontal, 10)
@@ -225,139 +214,6 @@ struct MenuBarContentView: View {
             }
 
             quickUpdateCard(isSetup: true)
-        }
-    }
-
-    private var focusSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("today")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(subtleText)
-                Spacer()
-                overviewStatus(todayStatus, tint: sourceNeedsAttention ? subtleText : dailyTint)
-            }
-
-            overviewMetrics(
-                primaryValue: model.focusHeroPrimaryValue,
-                primaryLabel: model.focusHeroPrimaryLabel,
-                secondaryValue: model.focusHeroSecondaryValue,
-                secondaryLabel: model.focusHeroSecondaryLabel
-            )
-
-            VStack(spacing: 8) {
-                HStack {
-                    Text("\(model.todayUsedValue) used")
-                    Spacer()
-                    Text("\(model.focusTargetValue) budget")
-                }
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(headerText)
-
-                DailyBudgetBarView(
-                    progressFraction: model.dailyBarProgressFraction,
-                    targetFraction: model.dailyBarTargetFraction,
-                    fillTint: dailyTint,
-                    budgetTint: progressTint,
-                    trackTint: trackTint,
-                    labelTint: subtleText,
-                    markerTint: headerText.opacity(0.72),
-                    budgetLabel: model.focusTargetLabel,
-                    bufferLabel: model.borrowedBufferTrackTitle,
-                    isOverBudget: model.isTodayOverBudget
-                )
-                .frame(height: model.isTodayOverBudget ? 42 : 22)
-            }
-        }
-        .help(model.isTodayOverBudget ? model.postLimitOutcomeLine : model.estimatedStopCountdownLine)
-        .padding(16)
-        .background {
-            glassPanelBackground(tint: dailyTint, tintOpacity: colorScheme == .dark ? 0.10 : 0.06)
-        }
-    }
-
-    private var todayStatus: String {
-        if sourceNeedsAttention { return "last reading" }
-        if model.trackedHistoryPoints.count < 2 { return "tracking" }
-        return model.isTodayOverBudget ? model.overBudgetStatusLine : "within budget"
-    }
-
-    private var sourceNeedsAttention: Bool {
-        model.hasSourceError || model.isAutomaticSourceStale
-    }
-
-    private var weeklySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("this week")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(subtleText)
-                Spacer()
-                overviewStatus(sourceNeedsAttention ? "last reading" : model.paceStatusLine,
-                               tint: sourceNeedsAttention ? subtleText : statusTint)
-            }
-
-            overviewMetrics(
-                primaryValue: model.weeklyHeroPrimaryValue,
-                primaryLabel: model.heroStyle == .remainingFirst ? "remaining" : model.weeklyHeroPrimaryLabel,
-                secondaryValue: model.weeklyHeroSecondaryValue,
-                secondaryLabel: model.heroStyle == .timeFirst ? "remaining" : model.weeklyHeroSecondaryLabel
-            )
-
-            PaceBarView(
-                actualFraction: model.summary.remainingFraction,
-                targetFraction: model.expectedRemainingFraction,
-                milestoneFractions: model.dailyTargetMilestoneFractions,
-                fillTint: progressTint,
-                milestoneTint: headerText.opacity(0.18),
-                markerTint: headerText.opacity(0.72),
-                trackTint: trackTint
-            )
-            .frame(height: 38)
-
-            if model.shouldShowTrend {
-                trendSection
-            } else {
-                Text(model.compactResetLine.lowercased())
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(subtleText)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-        }
-        .help(model.paceSummaryLine)
-        .padding(16)
-        .background {
-            glassPanelBackground(tint: progressTint, tintOpacity: colorScheme == .dark ? 0.08 : 0.045)
-        }
-    }
-
-    private var trendSection: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("usage trend")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(subtleText)
-
-                Spacer()
-
-                Text(model.compactResetLine.lowercased())
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(subtleText.opacity(0.82))
-            }
-
-            TrendSparklineView(
-                points: model.displayHistory,
-                windowStart: model.windowStart,
-                windowEnd: model.resetAt,
-                targetRemainingPercent: model.expectedRemainingPercent,
-                lineTint: progressTint,
-                pointTint: statusTint,
-                guideTint: subtleText.opacity(0.20),
-                targetTint: headerText.opacity(0.72),
-                deltaTint: statusTint.opacity(0.30)
-            )
-            .frame(height: 56)
         }
     }
 

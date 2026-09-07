@@ -6,8 +6,17 @@ struct UsageActivityView: View {
     let tint: Color
     let text: Color
     let secondaryText: Color
-    @State private var range: UsageActivityRange = .window
+    @State private var range: UsageActivityRange = .today
     @State private var selectedDate: Date?
+
+    init(model: UsageMonitorModel, tint: Color, text: Color, secondaryText: Color,
+         initialRange: UsageActivityRange = .today) {
+        self.model = model
+        self.tint = tint
+        self.text = text
+        self.secondaryText = secondaryText
+        _range = State(initialValue: initialRange)
+    }
 
     private var series: UsageActivitySeries {
         UsageActivitySeries(
@@ -21,10 +30,6 @@ struct UsageActivityView: View {
         let reading = data.nearest(to: selectedDate)
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("usage history")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(secondaryText)
-                Spacer()
                 Picker("Chart range", selection: $range) {
                     ForEach(UsageActivityRange.allCases) { range in
                         Text(range.rawValue).tag(range)
@@ -33,27 +38,27 @@ struct UsageActivityView: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .controlSize(.small)
-                .frame(width: 174)
+                .frame(maxWidth: .infinity)
             }
 
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(reading.map { "\(model.formattedNumber($0.remainingPercent))%" } ?? "--")
+                    Text(data.pointsPerHour.map { model.formattedNumber($0) } ?? "--")
                         .font(.system(size: 44, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(text)
-                    Text("allowance remaining")
+                    Text("pts / hour \u{00b7} average burn")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(secondaryText)
                 }
                 Spacer()
                 if let reading {
                     VStack(alignment: .trailing, spacing: 3) {
-                        Text(reading.timestamp, format: .dateTime.hour().minute())
-                            .font(.callout.weight(.semibold))
+                        Text("\(model.formattedNumber(reading.remainingPercent))%")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(text)
-                        Text(reading.timestamp, format: .dateTime.month(.abbreviated).day())
+                        Text("remaining")
                             .font(.caption)
                             .foregroundStyle(secondaryText)
                     }
@@ -61,20 +66,37 @@ struct UsageActivityView: View {
             }
 
             chart(data, reading: reading)
-                .frame(height: 210)
+                .frame(height: 250)
+                .focusable()
+                .onKeyPress(.leftArrow) { moveReading(-1, in: data); return .handled }
+                .onKeyPress(.rightArrow) { moveReading(1, in: data); return .handled }
+                .accessibilityLabel("Recorded remaining allowance")
+                .accessibilityValue(reading.map { "\(model.formattedNumber($0.remainingPercent)) percent" } ?? "No readings")
+                .accessibilityAdjustableAction { direction in
+                    moveReading(direction == .increment ? 1 : -1, in: data)
+                }
 
             HStack(spacing: 18) {
                 legend("recorded usage", dashed: false)
-                legend("even pace", dashed: true)
+                if data.showsPace { legend("even pace", dashed: true) }
             }
 
             Rectangle().fill(secondaryText.opacity(0.15)).frame(height: 1)
 
             HStack(alignment: .top, spacing: 20) {
-                metric(data.pointsPerHour.map { "\(model.formattedNumber($0))" } ?? "--", label: "pts / hour", caption: "average burn")
-                    .help("Allowance percentage points used per hour between the first and last readings in this view, including breaks.")
+                if let reading {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(selectedDate == nil ? "latest reading" : "selected reading")
+                            .font(.caption).foregroundStyle(secondaryText)
+                        Text(reading.timestamp, format: .dateTime.hour().minute())
+                            .font(.system(size: 24, weight: .semibold, design: .rounded))
+                            .foregroundStyle(text).monospacedDigit()
+                        Text(reading.timestamp, format: .dateTime.month(.abbreviated).day())
+                            .font(.caption2).foregroundStyle(secondaryText)
+                    }
+                }
                 Spacer(minLength: 0)
-                metric(data.observedUse.map { "\(model.formattedNumber($0))%" } ?? "--", label: "of allowance", caption: "used in view")
+                metric(data.observedUse.map { "\(model.formattedNumber($0))%" } ?? "--", label: "of allowance", caption: "recorded use")
             }
 
             if data.points.count < 2 {
@@ -90,17 +112,21 @@ struct UsageActivityView: View {
 
     private func chart(_ data: UsageActivitySeries, reading: UsageHistoryPoint?) -> some View {
         Chart {
-            ForEach([data.domain.lowerBound, data.domain.upperBound], id: \.self) { date in
+            if data.showsPace {
+              ForEach([data.domain.lowerBound, data.domain.upperBound], id: \.self) { date in
                 LineMark(x: .value("Time", date), y: .value("Remaining", data.expectedRemaining(at: date)), series: .value("Series", "pace"))
                     .foregroundStyle(secondaryText.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 5]))
+              }
             }
-            ForEach(data.points) { point in
-                AreaMark(x: .value("Time", point.timestamp), yStart: .value("Base", 0), yEnd: .value("Remaining", point.remainingPercent))
+            ForEach(data.segments) { segment in
+              ForEach(segment.points) { point in
+                AreaMark(x: .value("Time", point.timestamp), yStart: .value("Base", 0), yEnd: .value("Remaining", point.remainingPercent), series: .value("Segment", segment.id))
                     .foregroundStyle(LinearGradient(colors: [tint.opacity(0.22), tint.opacity(0.015)], startPoint: .top, endPoint: .bottom))
-                LineMark(x: .value("Time", point.timestamp), y: .value("Remaining", point.remainingPercent), series: .value("Series", "recorded"))
+                LineMark(x: .value("Time", point.timestamp), y: .value("Remaining", point.remainingPercent), series: .value("Series", segment.id))
                     .foregroundStyle(tint)
                     .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+              }
             }
             if let reading {
                 RuleMark(x: .value("Reading", reading.timestamp))
@@ -152,6 +178,13 @@ struct UsageActivityView: View {
                     }
             }
         }
+    }
+
+    private func moveReading(_ offset: Int, in data: UsageActivitySeries) {
+        guard !data.points.isEmpty else { return }
+        let current = data.nearest(to: selectedDate)
+        let index = data.points.firstIndex { $0.id == current?.id } ?? data.points.count - 1
+        selectedDate = data.points[min(max(index + offset, 0), data.points.count - 1)].timestamp
     }
 
     private func legend(_ title: String, dashed: Bool) -> some View {

@@ -4,7 +4,13 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @Bindable var model: UsageMonitorModel
+    @Bindable var activity: AgentActivityModel
     @State private var showsClearConfirmation = false
+
+    init(model: UsageMonitorModel, activity: AgentActivityModel = AgentActivityModel()) {
+        self.model = model
+        self.activity = activity
+    }
 
     var body: some View {
         Form {
@@ -49,6 +55,12 @@ struct SettingsView: View {
                 .buttonStyle(.borderedProminent)
             }
 
+            Section("Activity") {
+                Toggle("Model summaries", isOn: $activity.summariesEnabled)
+                Text("Summaries use your Codex login and allowance. Originals and cached summaries stay available when disabled.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
             Section("Appearance") {
                 Picker("Glass style", selection: $model.glassAppearance) {
                     ForEach(GlassAppearance.allCases) { appearance in
@@ -63,18 +75,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Picker("Hero style", selection: $model.heroStyle) {
-                    ForEach(HeroStyle.allCases) { heroStyle in
-                        Text(heroStyle.displayName)
-                            .tag(heroStyle)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                Text(model.heroStyleDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Section("\(model.providerName) Snapshot") {

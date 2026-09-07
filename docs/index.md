@@ -32,6 +32,10 @@ Machine-local setup lives in:
 - Invariants: `docs/workflow/invariants.md`
 
 ## Conditional and optional references
+- Lowdown integration: `docs/product/lowdown-integration.md`
+  - Usage/Activity boundaries and integration acceptance.
+- Bundled helper: `docs/ops/lowdown-helper.md`
+  - Preparing, embedding, and signing the pinned Lowdown executable.
 - Production standard: `docs/ops/production-engineering-standard.md`
   - Read this for production, release, reliability, or security-sensitive work.
 - macOS release signing: `docs/ops/macos-release.md`

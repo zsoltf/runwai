@@ -67,7 +67,8 @@ extension UsageMonitorModel {
     var currentHistoryPoint: UsageHistoryPoint {
         UsageHistoryPoint(
             timestamp: snapshot.lastUpdatedAt,
-            remainingPercent: remainingPercent(for: snapshot)
+            remainingPercent: remainingPercent(for: snapshot),
+            windowResetAt: snapshot.resetAt
         )
     }
 
@@ -107,7 +108,7 @@ extension UsageMonitorModel {
             return nil
         }
 
-        let points = trackedHistoryPoints
+        let points = trackedHistoryPoints.filter { $0.timestamp >= windowStart }
 
         if let lastBeforeStart = points.last(where: { $0.timestamp <= trackingStart }) {
             return UsageHistoryPoint(
@@ -209,15 +210,19 @@ extension UsageMonitorModel {
     ) -> [UsageHistoryPoint] {
         let point = UsageHistoryPoint(
             timestamp: snapshot.lastUpdatedAt,
-            remainingPercent: remainingPercent(for: snapshot)
+            remainingPercent: remainingPercent(for: snapshot),
+            windowResetAt: snapshot.resetAt
         )
 
         var history = history
-            .filter { $0.timestamp >= windowStart(for: snapshot).addingTimeInterval(-86_400) }
+            .filter { $0.timestamp >= snapshot.lastUpdatedAt.addingTimeInterval(-30 * 86_400)
+                && $0.timestamp < snapshot.lastUpdatedAt }
             .sorted { $0.timestamp < $1.timestamp }
 
         // Retain both ends of a plateau so the chart does not turn a break into burn.
         if history.count >= 2,
+           history[history.count - 1].windowResetAt == point.windowResetAt,
+           history[history.count - 2].windowResetAt == point.windowResetAt,
            abs(history[history.count - 1].remainingPercent - point.remainingPercent) < 0.05,
            abs(history[history.count - 2].remainingPercent - point.remainingPercent) < 0.05 {
             history[history.count - 1] = point
@@ -228,13 +233,14 @@ extension UsageMonitorModel {
         return history
     }
 
-    func normalizeImportedHistory(_ points: [AutomaticUsageHistoryPoint]) -> [UsageHistoryPoint] {
+    func normalizeImportedHistory(_ points: [AutomaticUsageHistoryPoint], resetAt: Date? = nil) -> [UsageHistoryPoint] {
         var normalized: [UsageHistoryPoint] = []
 
         for point in points.sorted(by: { $0.timestamp < $1.timestamp }) {
             let normalizedPoint = UsageHistoryPoint(
                 timestamp: point.timestamp,
-                remainingPercent: point.remainingPercent
+                remainingPercent: point.remainingPercent,
+                windowResetAt: resetAt
             )
 
             if normalized.count >= 2,

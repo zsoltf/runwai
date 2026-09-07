@@ -80,6 +80,56 @@ struct UsageActivitySeriesTests {
         }
         #expect(history.map(\.remainingPercent) == [90, 90, 85, 85, 80])
         #expect(history.map { $0.timestamp.timeIntervalSince(start) / 3_600 } == [0, 2, 3, 5, 6])
-        #expect(model.normalizeImportedHistory(imported) == history)
+        #expect(model.normalizeImportedHistory(imported, resetAt: start.addingTimeInterval(604_800)) == history)
+    }
+
+    @Test
+    func historicalIncludesPreviousWindowsWithoutConnectingResets() {
+        let oldReset = start
+        let newReset = start.addingTimeInterval(604_800)
+        let history = [
+            UsageHistoryPoint(timestamp: start.addingTimeInterval(-40 * 86_400), remainingPercent: 75),
+            UsageHistoryPoint(timestamp: start.addingTimeInterval(-3_600), remainingPercent: 5, windowResetAt: oldReset),
+            UsageHistoryPoint(timestamp: start, remainingPercent: 100, windowResetAt: newReset),
+            UsageHistoryPoint(timestamp: start.addingTimeInterval(3_600), remainingPercent: 95, windowResetAt: newReset)
+        ]
+        let series = UsageActivitySeries(history: history, range: .historical,
+            windowStart: start, windowEnd: newReset, now: start.addingTimeInterval(7_200))
+        #expect(series.points.count == 3)
+        #expect(series.segments.count == 2)
+        #expect(series.pointsPerHour == 5)
+        #expect(series.observedUse == 5)
+        #expect(series.showsPace == false)
+    }
+
+    @MainActor
+    @Test
+    func syncRetainsOldWindowsAndLocalReadings() {
+        let suite = "runwai.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ManualUsageStore(defaults: defaults)
+        let model = UsageMonitorModel(store: store, automaticSyncServices: [:])
+        defer { model.refreshTimer?.invalidate() }
+        let old = UsageHistoryPoint(timestamp: start.addingTimeInterval(-86_400), remainingPercent: 10, windowResetAt: start)
+        let local = UsageHistoryPoint(timestamp: start, remainingPercent: 90)
+        model.history = [old, local]
+        let snapshot = UsageSnapshot(weeklyBudgetUnits: 100, usedUnits: 20,
+            windowDuration: 604_800, resetAt: start.addingTimeInterval(604_800),
+            lastUpdatedAt: start.addingTimeInterval(7_200))
+        model.applyAutomaticSyncPayload(AutomaticUsageSyncPayload(provider: .codex, usageSnapshot: snapshot,
+            detail: nil, historyPoints: [AutomaticUsageHistoryPoint(timestamp: start.addingTimeInterval(3_600), remainingPercent: 85)]))
+        #expect(model.history.contains(old))
+        #expect(model.history.contains(local))
+        #expect(model.history.last?.remainingPercent == 80)
+        #expect(store.loadHistory(for: .codex) == model.history)
+    }
+
+    @Test
+    func oldHistoryDecodesWithoutWindowMetadata() throws {
+        let data = Data("[{\"timestamp\":0,\"remainingPercent\":50}]".utf8)
+        let points = try JSONDecoder().decode([UsageHistoryPoint].self, from: data)
+        #expect(points.first?.windowResetAt == nil)
+        #expect(points.first?.remainingPercent == 50)
     }
 }

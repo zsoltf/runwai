@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output_path="${1:-$repo_root/docs/assets/runwai-codex.png}"
 provider="${2:-codex}"
 appearance="${3:-light}"
+range="${4:-Day}"
 tmp_swift_base="$(mktemp -t runwai-readme-render)"
 tmp_swift="${tmp_swift_base}.swift"
 mv "$tmp_swift_base" "$tmp_swift"
@@ -42,7 +43,7 @@ struct RenderRunwaiScreenshot {
         }
         defer { defaults.removePersistentDomain(forName: previewSuiteName) }
         let store = ManualUsageStore(defaults: defaults)
-        let referenceNow = Date()
+        let referenceNow = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 6, hour: 15, minute: 42))!
 
         seedPreviewData(store: store, now: referenceNow)
 
@@ -51,7 +52,8 @@ struct RenderRunwaiScreenshot {
         model.selectedProvider = provider
         model.now = referenceNow
 
-        let view = MenuBarContentView(model: model)
+        let range = CommandLine.arguments.count > 4 ? UsageActivityRange(rawValue: CommandLine.arguments[4]) ?? .today : .today
+        let view = MenuBarContentView(model: model, initialUsageRange: range)
             .frame(width: 420, height: 640)
             .environment(\.colorScheme, colorScheme)
 
@@ -92,13 +94,18 @@ struct RenderRunwaiScreenshot {
 
             switch provider {
             case .codex:
-                snapshot.usedUnits = 47
+                snapshot.usedUnits = 78
                 snapshot.resetAt = now.addingTimeInterval(4 * 86_400)
                 history = [
                     UsageHistoryPoint(timestamp: now.addingTimeInterval(-(72 * 3_600)), remainingPercent: 86),
                     UsageHistoryPoint(timestamp: now.addingTimeInterval(-(48 * 3_600)), remainingPercent: 75),
-                    UsageHistoryPoint(timestamp: Calendar.current.startOfDay(for: now), remainingPercent: 62),
-                    UsageHistoryPoint(timestamp: now, remainingPercent: 53)
+                    UsageHistoryPoint(timestamp: now.addingTimeInterval(-4.5 * 3_600), remainingPercent: 49),
+                    UsageHistoryPoint(timestamp: now.addingTimeInterval(-3.5 * 3_600), remainingPercent: 40),
+                    UsageHistoryPoint(timestamp: now.addingTimeInterval(-3 * 3_600), remainingPercent: 40),
+                    UsageHistoryPoint(timestamp: now.addingTimeInterval(-2.5 * 3_600), remainingPercent: 33),
+                    UsageHistoryPoint(timestamp: now.addingTimeInterval(-1.5 * 3_600), remainingPercent: 26),
+                    UsageHistoryPoint(timestamp: now.addingTimeInterval(-0.5 * 3_600), remainingPercent: 23),
+                    UsageHistoryPoint(timestamp: now, remainingPercent: 22)
                 ]
                 store.saveMode(.codexApp, for: provider)
 
@@ -137,31 +144,12 @@ struct RenderRunwaiScreenshot {
 }
 SWIFT
 
-swiftc -target arm64-apple-macos14.0 -framework SwiftUI -framework AppKit \
-  "$repo_root/Runwai/App/UsageMonitorModel.swift" \
-  "$repo_root/Runwai/App/UsageMonitorModel+Sync.swift" \
-  "$repo_root/Runwai/App/UsageMonitorModel+Storage.swift" \
-  "$repo_root/Runwai/App/UsageMonitorModel+Tracking.swift" \
-  "$repo_root/Runwai/Models/GlassAppearance.swift" \
-  "$repo_root/Runwai/Models/HeroStyle.swift" \
-  "$repo_root/Runwai/Models/RunwaiFormatters.swift" \
-  "$repo_root/Runwai/Models/UsageHistoryPoint.swift" \
-  "$repo_root/Runwai/Models/UsageActivitySeries.swift" \
-  "$repo_root/Runwai/Models/UsageProvider.swift" \
-  "$repo_root/Runwai/Models/UsageSnapshot.swift" \
-  "$repo_root/Runwai/Models/UsageSourceMode.swift" \
-  "$repo_root/Runwai/Services/AutomaticUsageSyncing.swift" \
-  "$repo_root/Runwai/Services/CodexQuotaSyncService.swift" \
-  "$repo_root/Runwai/Services/ManualUsageStore.swift" \
-  "$repo_root/Runwai/Services/GeminiQuotaSyncService.swift" \
-  "$repo_root/Runwai/Services/PacingCalculator.swift" \
-  "$repo_root/Runwai/Views/MenuBarContentView.swift" \
-  "$repo_root/Runwai/Views/MenuBarContentView+Style.swift" \
-  "$repo_root/Runwai/Views/MenuBarLabelView.swift" \
-  "$repo_root/Runwai/Views/RunwaiPacingBars.swift" \
-  "$repo_root/Runwai/Views/UsageActivityView.swift" \
-  "$repo_root/Runwai/Views/SettingsView.swift" \
-  "$tmp_swift" \
-  -o "$tmp_binary"
+sources=()
+while IFS= read -r -d '' source; do
+  sources+=("$source")
+done < <(find "$repo_root/Runwai" -name '*.swift' ! -name RunwaiApp.swift -print0)
 
-"$tmp_binary" "$output_path" "$provider" "$appearance"
+swiftc -swift-version 6 -target "$(uname -m)-apple-macos14.0" -framework SwiftUI -framework AppKit \
+  "${sources[@]}" "$tmp_swift" -o "$tmp_binary"
+
+"$tmp_binary" "$output_path" "$provider" "$appearance" "$range"

@@ -218,8 +218,7 @@ struct CodexQuotaSyncService: AutomaticUsageSyncing {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        try process.run()
-        try waitForExit(of: process)
+        try runAndWaitForExit(process)
 
         let stdout = String(decoding: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         let stderr = String(decoding: stderrPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
@@ -313,13 +312,12 @@ struct CodexQuotaSyncService: AutomaticUsageSyncing {
         )
     }
 
-    private func waitForExit(of process: Process) throws {
+    private func runAndWaitForExit(_ process: Process) throws {
         let semaphore = DispatchSemaphore(value: 0)
-
-        DispatchQueue.global(qos: .userInitiated).async {
-            process.waitUntilExit()
-            semaphore.signal()
-        }
+        // Register before launch: waitUntilExit on a second thread can miss a
+        // short-lived child's completion while its launching thread is blocked.
+        process.terminationHandler = { _ in semaphore.signal() }
+        try process.run()
 
         if semaphore.wait(timeout: .now() + queryTimeout) == .timedOut {
             if process.isRunning {
