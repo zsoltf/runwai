@@ -8,15 +8,22 @@ work: the public Lowdown 0.1.0 executable does not implement it.
 
 Current development pin:
 
-- Source: `d894a3d643c106fb1b3fc4c95dc2eb4ac8e1e8b9`
-- Target: `aarch64-apple-darwin` (Apple Silicon only)
-- SHA-256: `d8bfaba3c26f027e05d5120ac3eeb5bbc9e745e11e2ca108b3a28a581a354294`
+- Source: `484411ef6f6f890c3a0dfb6330ae2d2643b89c0b`
+- Target: `universal-apple-darwin` (`arm64` and `x86_64`)
+- SHA-256: `948992ade3cea7fe2b9db080f144a765312233338f34788bb0edd3f90b8cbc1f`
 
-This candidate is not the public 0.1.0 release. Intel/universal packaging and
-notarization remain release work.
+This candidate is not the public 0.1.0 release. App release validation, signing
+and notarization remain separate work.
 
 Obtain a bridge-capable binary and its source commit and SHA-256 from the
 independent Lowdown build. Do not substitute an arbitrary `lowdown` on PATH.
+Lowdown owns the local build script `scripts/build-macos-bridge.sh`. From its
+clean checkout at the source commit above, run `bash scripts/build-macos-bridge.sh`
+with both Rust macOS targets and Xcode command-line tools available. It builds
+offline from `Cargo.lock` and creates
+`target/runwai-bridge/<source-commit>/universal-apple-darwin/lowdown`, refusing to
+overwrite an existing pin. Use the supplied artifact hash above for this
+candidate; architecture membership alone does not prove either slice runs.
 
 ```bash
 scripts/prepare_lowdown.sh /absolute/path/to/lowdown EXPECTED_SHA256 SOURCE_COMMIT
@@ -46,8 +53,10 @@ inside an already notarized app.
 - Development checks set `LOWDOWN_SUMMARY_PROVIDER=fallback` and use isolated
   fixture data. Keep live model smoke tests separate and bounded.
 - `LowdownIntegrationTests` uses the embedded executable and an explicitly
-  missing Codex path to exercise cache, live arrivals, full text and fallback.
-  Without an embedded helper, that test is skipped; unit tests still run.
+  missing Codex path to exercise cache, live arrivals, full text, paging and
+  fallback. Fixtures require canonical final/completion echoes to share one
+  message identity while equal-text finals in distinct turns remain separate.
+  Without an embedded helper, these tests are skipped; unit tests still run.
 - Oversized transcript records are skipped within bounded reads; recent readable
   updates stay available. Activity marks partial history without an error panel.
 - Both progress and final answers use Lowdown's existing summary/cache pipeline.

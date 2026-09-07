@@ -40,6 +40,7 @@ struct LowdownEvent: Decodable, Sendable {
     struct Payload: Decodable, Sendable {
         let helperVersion: String?
         let sourceRevision: String?
+        let source: String?
         let capabilities: [String]?
         let items: [LowdownItem]?
         let projectId: String?

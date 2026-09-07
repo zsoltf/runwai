@@ -5,6 +5,59 @@ import Testing
 struct UsageActivitySeriesTests {
     private let start = Date(timeIntervalSince1970: 1_788_652_800)
 
+    @Test(arguments: UsageActivityRange.allCases)
+    func correctedSegmentsUseDurationWeightedRateWithoutBridgingGaps(range: UsageActivityRange) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let history = zip([0.0, 1, 3, 6, 8], [90.0, 84, 95, 92, 99]).map {
+            UsageHistoryPoint(timestamp: start.addingTimeInterval($0.0 * 3_600), remainingPercent: $0.1)
+        }
+        let series = UsageActivitySeries(history: history, range: range, windowStart: start,
+            windowEnd: start.addingTimeInterval(86_400), now: start.addingTimeInterval(9 * 3_600), calendar: calendar)
+        #expect(series.segments.map { $0.points.count } == [2, 2, 1])
+        #expect(series.observedUse == 9)
+        // 6 points in one hour plus 3 in three hours, not the mean of the rates
+        // or the nine-hour span containing unobserved correction gaps.
+        #expect(series.pointsPerHour == 2.25)
+    }
+
+    @Test(arguments: UsageActivityRange.allCases)
+    func resetMetadataBreaksEvenADecreasingReading(range: UsageActivityRange) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let end = start.addingTimeInterval(86_400)
+        let history = [
+            UsageHistoryPoint(timestamp: start, remainingPercent: 90, windowResetAt: end),
+            UsageHistoryPoint(timestamp: start.addingTimeInterval(3_600), remainingPercent: 86, windowResetAt: end),
+            UsageHistoryPoint(timestamp: start.addingTimeInterval(7_200), remainingPercent: 80, windowResetAt: end.addingTimeInterval(1)),
+            UsageHistoryPoint(timestamp: start.addingTimeInterval(10_800), remainingPercent: 78, windowResetAt: end.addingTimeInterval(1))
+        ]
+        let series = UsageActivitySeries(history: history, range: range, windowStart: start,
+            windowEnd: end, now: start.addingTimeInterval(14_400), calendar: calendar)
+        #expect(series.segments.count == 2)
+        #expect(series.observedUse == 6)
+        #expect(series.pointsPerHour == 3)
+    }
+
+    @Test(arguments: UsageActivityRange.allCases)
+    func thresholdUsesCombinedCleanTimeAndPlateausCount(range: UsageActivityRange) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        for seconds in [899.0, 900] {
+            let history = [
+                UsageHistoryPoint(timestamp: start, remainingPercent: 80),
+                UsageHistoryPoint(timestamp: start.addingTimeInterval(400), remainingPercent: 80),
+                UsageHistoryPoint(timestamp: start.addingTimeInterval(3_600), remainingPercent: 90),
+                UsageHistoryPoint(timestamp: start.addingTimeInterval(3_600 + seconds - 400), remainingPercent: 90),
+                UsageHistoryPoint(timestamp: start.addingTimeInterval(7_200), remainingPercent: 100)
+            ]
+            let series = UsageActivitySeries(history: history, range: range, windowStart: start,
+                windowEnd: start.addingTimeInterval(86_400), now: start.addingTimeInterval(10_800), calendar: calendar)
+            #expect(series.observedUse == 0)
+            #expect(series.pointsPerHour == (seconds == 900 ? 0 : nil))
+        }
+    }
+
     @Test
     func rateUsesObservedTimeNotTimeSinceLastSync() {
         let end = start.addingTimeInterval(7 * 86_400)

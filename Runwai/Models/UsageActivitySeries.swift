@@ -53,18 +53,12 @@ struct UsageActivitySeries {
     }
 
     var observedUse: Double? {
-        if !showsPace {
-            let intervals = segments.filter { $0.points.count >= 2 }
-            guard !intervals.isEmpty else { return nil }
-            return intervals.reduce(0) { $0 + $1.points.first!.remainingPercent - $1.points.last!.remainingPercent }
-        }
-        guard let first = points.first, let last = points.last, points.count >= 2 else { return nil }
-        // A quota correction is not negative consumption. Wait for a clean interval.
-        guard segments.count == 1 else {
-            return nil
-        }
-        return first.remainingPercent - last.remainingPercent
+        let intervals = observedSegments
+        guard !intervals.isEmpty else { return nil }
+        return intervals.reduce(0) { $0 + $1.points.first!.remainingPercent - $1.points.last!.remainingPercent }
     }
+
+    private var observedSegments: [Segment] { segments.filter { $0.points.count >= 2 } }
 
     struct Segment: Identifiable {
         let id: Date
@@ -87,8 +81,9 @@ struct UsageActivitySeries {
     }
 
     var pointsPerHour: Double? {
-        guard let first = points.first, let last = points.last, let used = observedUse else { return nil }
-        let elapsed = showsPace ? last.timestamp.timeIntervalSince(first.timestamp) : segments.reduce(0) {
+        guard let used = observedUse else { return nil }
+        // Weight only the same clean intervals that contributed recorded use.
+        let elapsed = observedSegments.reduce(0.0) {
             $0 + $1.points.last!.timestamp.timeIntervalSince($1.points.first!.timestamp)
         }
         guard elapsed >= 15 * 60 else { return nil }

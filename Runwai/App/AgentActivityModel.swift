@@ -39,7 +39,10 @@ final class AgentActivityModel {
     var isPaused = false
     var isLoadingOlder = false
     var summaryStatus = "raw"
-    var errorMessage: String?
+    var errorMessage: String? {
+        connectionFailure ?? catalogFailure ?? selectionFailure?.message ?? pageFailure ?? summaryFailure
+            ?? originalFailures.sorted { $0.key < $1.key }.first?.value
+    }
     var catalogPartial = false
     var historyPartial = false
     var hasMore = false
@@ -65,6 +68,13 @@ final class AgentActivityModel {
     private var pendingText: Set<String> = []
     private enum Request { case selection, page, original(String) }
     private var requests: [String: Request] = [:]
+    private var connectionFailure: String?
+    private var catalogFailure: String?
+    private var selectionFailure: (requestID: String?, message: String)?
+    private var pageFailure: String?
+    private var summaryFailure: String?
+    private var originalFailures: [String: String] = [:]
+    private var catalogRequestID: String?
     private var visible = false
     private var wantsRecentProject = false
     private var recentDiscoveryID: String?
@@ -156,10 +166,9 @@ final class AgentActivityModel {
 
     private func connect() {
         guard let executable else {
-            errorMessage = LowdownBridgeError.unavailable.localizedDescription
+            connectionFailure = LowdownBridgeError.unavailable.localizedDescription
             return
         }
-        errorMessage = nil
         var env = environment
         if !summariesEnabled { env["LOWDOWN_SUMMARY_PROVIDER"] = "fallback" }
         let connection = LowdownBridge(executable: executable, environment: env)
@@ -173,7 +182,7 @@ final class AgentActivityModel {
                 }
             } catch {
                 guard !Task.isCancelled else { return }
-                self?.errorMessage = error.localizedDescription
+                self?.connectionFailure = error.localizedDescription
             }
             guard !Task.isCancelled else { return }
             self?.isConnected = false
@@ -255,7 +264,7 @@ final class AgentActivityModel {
         isLoading = true
         hasActiveSelection = false
         answerStatus = "outside_window_or_absent"
-        errorMessage = nil
+        retireSelectionFailures()
         requests = [:]
         let command = LowdownCommand(command: "select", generation: generation,
             projectRoot: root, sessionId: selectedSession)
@@ -265,13 +274,16 @@ final class AgentActivityModel {
     }
 
     private func discover() {
-        bridge?.send(LowdownCommand(command: "discover", projectRoots: savedRoots))
+        let command = LowdownCommand(command: "discover", projectRoots: savedRoots)
+        catalogRequestID = command.id
+        bridge?.send(command)
     }
 
     private func discoverMostRecent() {
         guard recentDiscoveryID == nil else { return }
         let command = LowdownCommand(command: "discover", projectRoots: savedRoots)
         recentDiscoveryID = command.id
+        catalogRequestID = command.id
         bridge?.send(command)
     }
 
@@ -311,6 +323,7 @@ final class AgentActivityModel {
         let payload = event.payload
         if event.event == "hello" {
             isConnected = true
+            connectionFailure = nil
             if wantsRecentProject && visible {
                 isLoading = true
                 discoverMostRecent()
@@ -324,6 +337,7 @@ final class AgentActivityModel {
             return
         }
         if event.event == "projects" {
+            if let id = event.requestId, id == catalogRequestID { catalogFailure = nil }
             projects = (payload.items ?? []).compactMap {
                 guard let id = $0.id, let root = $0.root, let name = $0.name else { return nil }
                 return Project(id: id, root: root, name: name,
@@ -356,14 +370,21 @@ final class AgentActivityModel {
             }
             return
         }
+        if event.event == "error", let id = event.requestId, id == catalogRequestID {
+            catalogFailure = payload.message
+            if generation == 0 { isLoading = false }
+            return
+        }
         if let generation = event.generation, generation != self.generation { return }
         if event.event == "error", event.generation == nil {
-            errorMessage = payload.message
+            guard event.requestId == nil else { return }
+            connectionFailure = payload.message
             if generation == 0 { isLoading = false }
             return
         }
         guard event.generation == generation else { return }
         if event.event == "reset" {
+            retireSelectionFailures()
             historyPartial = false
             revision = event.sessionRevision
             messages = []; summaries = [:]; fullTexts = [:]; latestAnswer = nil
@@ -376,10 +397,13 @@ final class AgentActivityModel {
         }
         if let received = event.sessionRevision, let revision, received != revision { return }
         if event.event == "snapshot" {
-            revision = event.sessionRevision; hasActiveSelection = true; errorMessage = nil
+            revision = event.sessionRevision; hasActiveSelection = true
         }
         switch event.event {
         case "snapshot", "updates", "page":
+            if event.event != "page", let failure = selectionFailure,
+               failure.requestID == event.requestId { selectionFailure = nil }
+            if event.event == "page", let id = event.requestId, case .page = requests[id] { pageFailure = nil }
             if let coverage = payload.readCoverage {
                 historyPartial = historyPartial || coverage.oversizedRecordsSkipped == true || coverage.scanLimited == true
             }
@@ -402,6 +426,11 @@ final class AgentActivityModel {
             for item in payload.items ?? [] {
                 if let id = item.messageId, let text = item.text { summaries[id] = text }
             }
+            // Ready/cache events do not establish that the model has recovered.
+            if revision != nil, event.sessionRevision == revision,
+               payload.source == "model", payload.items?.isEmpty == false {
+                summaryFailure = nil
+            }
         case "state":
             isLoading = payload.loading ?? isLoading
             isPaused = payload.paused ?? isPaused
@@ -416,10 +445,13 @@ final class AgentActivityModel {
                     let url = try await store.append(key: requestID, offset: offset,
                         text: text, total: total, done: payload.done == true)
                     guard event.generation == generation, event.sessionRevision == revision else { return }
-                    if let url { originalFiles[id] = url; pendingText.remove(id); requests[requestID] = nil }
+                    if let url {
+                        originalFiles[id] = url; pendingText.remove(id); requests[requestID] = nil
+                        originalFailures[id] = nil
+                    }
                 } catch {
                     guard event.generation == generation, event.sessionRevision == revision else { return }
-                    errorMessage = "Original text could not be loaded."
+                    originalFailures[id] = "Original text could not be loaded."
                     pendingText.remove(id)
                     requests[requestID] = nil
                     await store.discard(key: requestID)
@@ -429,7 +461,7 @@ final class AgentActivityModel {
             var bytes = textTransfers[id] ?? Data()
             guard bytes.count == offset, total >= 0, offset <= total,
                   text.utf8.count <= total - offset else {
-                errorMessage = "Original text was incomplete."
+                originalFailures[id] = "Original text was incomplete."
                 pendingText.remove(id); textTransfers[id] = nil
                 requests[requestID] = nil
                 return
@@ -437,31 +469,45 @@ final class AgentActivityModel {
             bytes.append(contentsOf: text.utf8)
             if payload.done == true {
                 guard bytes.count == total else {
-                    errorMessage = "Original text was incomplete."
+                    originalFailures[id] = "Original text was incomplete."
                     pendingText.remove(id); textTransfers[id] = nil; requests[requestID] = nil
                     return
                 }
                 fullTexts[id] = String(decoding: bytes, as: UTF8.self)
+                originalFailures[id] = nil
                 pendingText.remove(id); textTransfers[id] = nil
                 requests[requestID] = nil
             } else { textTransfers[id] = bytes }
         case "error":
-            errorMessage = payload.message
             if let id = event.requestId, let request = requests.removeValue(forKey: id) {
                 switch request {
                 case .selection:
+                    selectionFailure = payload.message.map { (id, $0) }
                     messages = []; summaries = [:]; latestAnswer = nil; revision = nil
                     hasActiveSelection = false; isLoading = false
-                case .page: isLoadingOlder = false
+                case .page:
+                    pageFailure = payload.message
+                    isLoadingOlder = false
                 case .original(let messageID):
+                    originalFailures[messageID] = payload.message
                     pendingText.remove(messageID); textTransfers[messageID] = nil
                     await originalStore.discard(key: id)
                 }
-            } else if payload.code == "model_failed" || payload.code == "model_unavailable" {
+            } else if payload.code == "model_failed" || payload.code == "model_unavailable" || payload.code == "cache_busy" {
+                summaryFailure = payload.message
                 summaryStatus = "unavailable"
+            } else if event.requestId == nil {
+                selectionFailure = payload.message.map { (nil, $0) }
             }
         default: break
         }
+    }
+
+    private func retireSelectionFailures() {
+        selectionFailure = nil
+        pageFailure = nil
+        summaryFailure = nil
+        originalFailures = [:]
     }
 
     private func clearPendingReads() {
