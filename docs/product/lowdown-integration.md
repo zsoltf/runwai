@@ -41,6 +41,10 @@ light/dark styling, keyboard access, and a single outer surface.
   imported snapshots. Plateau endpoints remain intact. Weekly-only sync works.
 - Cached startup and project switching paint without waiting for a model.
   Slow summaries cannot block tab switching, scrolling, or cancellation.
+- Activity's project dropdown lists the 10 most recently active projects plus
+  Choose Folder. Each popup opening selects the newest project when Activity
+  is shown; Usage alone does not start model work. Manual selection stays put
+  until the popup closes, and per-project session choices remain remembered.
 - New arrivals and new sessions appear without restarting. Old-generation
   events never replace the selected project's content.
 - Full originals and final answers are readable, including large messages.

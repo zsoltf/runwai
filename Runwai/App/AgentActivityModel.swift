@@ -10,6 +10,7 @@ final class AgentActivityModel {
         let id: String
         let root: String
         let name: String
+        var lastActivity: Date? = nil
     }
     struct Session: Identifiable, Equatable {
         let id: String
@@ -64,6 +65,8 @@ final class AgentActivityModel {
     private enum Request { case selection, page, original(String) }
     private var requests: [String: Request] = [:]
     private var visible = false
+    private var wantsRecentProject = false
+    private var recentDiscoveryID: String?
     private var originalStore = LowdownOriginalStore()
 
     init(defaults: UserDefaults = .standard, executable: URL? = LowdownBridge.bundledExecutable,
@@ -87,6 +90,13 @@ final class AgentActivityModel {
     deinit { reader?.cancel(); bridge?.stop() }
 
     var selectedProject: Project? { projects.first { $0.root == selectedRoot } }
+    var recentProjects: [Project] {
+        Array(projects.sorted {
+            let left = $0.lastActivity ?? .distantPast
+            let right = $1.lastActivity ?? .distantPast
+            return left == right ? $0.root < $1.root : left > right
+        }.prefix(10))
+    }
     var sessions: [Session] { sessionsByProject[selectedProject?.id ?? ""] ?? [] }
     var projectName: String { selectedProject?.name ?? selectedRoot.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Choose project" }
     var status: String {
@@ -103,14 +113,28 @@ final class AgentActivityModel {
     private var savedSessions: [String: String] { defaults.dictionary(forKey: "runwai.activity.sessions") as? [String: String] ?? [:] }
     private var selectionKey: String { "\(selectedRoot ?? "")\n\(selectedSession ?? "latest")" }
 
+    func popupOpened() {
+        wantsRecentProject = true
+        recentDiscoveryID = nil
+    }
+
+    func popupClosed() {
+        cancelRecentSelection()
+        hide()
+    }
+
     func show() {
         visible = true
         if bridge == nil { connect() }
-        else if isConnected && generation > 0 { send("resume") }
+        else if isConnected {
+            if wantsRecentProject { discoverMostRecent() }
+            else if generation > 0 { send("resume") }
+        }
     }
 
     func hide() {
         visible = false
+        recentDiscoveryID = nil
         if generation > 0 { send("pause") }
     }
 
@@ -120,6 +144,7 @@ final class AgentActivityModel {
         bridge?.stop()
         bridge = nil
         isConnected = false
+        recentDiscoveryID = nil
         hasActiveSelection = false
         clearPendingReads()
         originalFiles = [:]
@@ -159,6 +184,7 @@ final class AgentActivityModel {
     }
 
     func chooseFolder() {
+        cancelRecentSelection()
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -173,18 +199,24 @@ final class AgentActivityModel {
 
     @discardableResult
     func selectProject(_ root: String) -> String? {
+        cancelRecentSelection()
+        let request = activateProject(root)
+        discover()
+        return request
+    }
+
+    private func activateProject(_ root: String) -> String? {
         rememberCurrent()
         let root = Self.canonicalRoot(root)
         selectedRoot = root
         selectedSession = savedSessions[root]
         defaults.set(root, forKey: "runwai.activity.project")
         defaults.set(Array(([root] + savedRoots.filter { $0 != root }).prefix(20)), forKey: "runwai.activity.recentProjects")
-        let request = selectCurrent()
-        discover()
-        return request
+        return selectCurrent()
     }
 
     func selectSession(_ id: String?) {
+        cancelRecentSelection()
         rememberCurrent()
         selectedSession = id
         var saved = savedSessions
@@ -234,6 +266,18 @@ final class AgentActivityModel {
         bridge?.send(LowdownCommand(command: "discover", projectRoots: savedRoots))
     }
 
+    private func discoverMostRecent() {
+        guard recentDiscoveryID == nil else { return }
+        let command = LowdownCommand(command: "discover", projectRoots: savedRoots)
+        recentDiscoveryID = command.id
+        bridge?.send(command)
+    }
+
+    private func cancelRecentSelection() {
+        wantsRecentProject = false
+        recentDiscoveryID = nil
+    }
+
     private func send(_ command: String) { bridge?.send(LowdownCommand(command: command, generation: generation)) }
 
     @discardableResult
@@ -265,6 +309,11 @@ final class AgentActivityModel {
         let payload = event.payload
         if event.event == "hello" {
             isConnected = true
+            if wantsRecentProject && visible {
+                isLoading = true
+                discoverMostRecent()
+                return
+            }
             discover()
             isLoading = selectedRoot != nil
             // Opaque saved IDs must be resolved by the new helper's catalog.
@@ -275,9 +324,22 @@ final class AgentActivityModel {
         if event.event == "projects" {
             projects = (payload.items ?? []).compactMap {
                 guard let id = $0.id, let root = $0.root, let name = $0.name else { return nil }
-                return Project(id: id, root: root, name: name)
+                return Project(id: id, root: root, name: name,
+                               lastActivity: Self.activityDate($0.lastActivity))
             }
             catalogPartial = payload.partial ?? false
+            // Only this opening's discovery can choose a project. Periodic
+            // catalogs and late replies must never override a manual choice.
+            if visible, wantsRecentProject, let recentDiscoveryID,
+               event.requestId == recentDiscoveryID {
+                cancelRecentSelection()
+                if let latest = recentProjects.first {
+                    _ = activateProject(latest.root)
+                    send("resume")
+                } else {
+                    isLoading = false
+                }
+            }
             return
         }
         if event.event == "sessions", let project = payload.projectId {
@@ -416,5 +478,12 @@ final class AgentActivityModel {
         guard let path = realpath(root, nil) else { return root }
         defer { free(path) }
         return String(cString: path)
+    }
+
+    private static func activityDate(_ raw: String?) -> Date? {
+        guard let raw else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
     }
 }

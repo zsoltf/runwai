@@ -66,8 +66,11 @@ struct MenuBarContentView: View {
         .onChange(of: page) {
             if page == .activity { activity.show() } else { activity.hide() }
         }
-        .onAppear { if page == .activity { activity.show() } }
-        .onDisappear { activity.hide() }
+        .onAppear {
+            activity.popupOpened()
+            if page == .activity { activity.show() }
+        }
+        .onDisappear { activity.popupClosed() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             activity.shutdown()
         }

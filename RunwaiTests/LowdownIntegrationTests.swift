@@ -9,6 +9,54 @@ import Darwin
 @MainActor
 struct LowdownIntegrationTests {
     @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
+    func popupSelectsNewestProjectButTabSwitchingPreservesManualChoice() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        var projects: [(root: URL, path: URL)] = []
+        let now = Date()
+        for index in 0..<12 {
+            let project = try fixture.session(project: "project-\(index)", name: "session-\(index)", count: 1)
+            try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(Double(index - 12) * 60)],
+                                                  ofItemAtPath: project.path.path)
+            projects.append(project)
+        }
+        fixture.defaults.set(projects[0].root.path, forKey: "runwai.activity.project")
+        let model = AgentActivityModel(defaults: fixture.defaults,
+            executable: try #require(LowdownBridge.bundledExecutable), environment: fixture.environment)
+        defer { model.shutdown() }
+        model.popupOpened()
+        model.show()
+        try await wait { model.hasActiveSelection && model.summaries.values.contains("Cached session-11 update") }
+        #expect(model.selectedRoot == projects[11].root.path)
+        #expect(model.recentProjects.map(\.root) == projects.suffix(10).reversed().map { $0.root.path })
+
+        model.selectProject(projects[3].root.path)
+        try await wait { model.latestAnswer?.originalText == "Complete answer for session-3" }
+        model.hide()
+        try await wait { model.isPaused }
+        model.show()
+        try await wait { !model.isPaused }
+        #expect(model.selectedRoot == projects[3].root.path)
+
+        model.popupClosed()
+        try await wait { model.isPaused }
+        try fixture.append("Newest project now", to: projects[0].path)
+        model.popupOpened()
+        model.show()
+        try await wait { model.selectedRoot == projects[0].root.path && model.hasActiveSelection }
+        try await wait { model.messages.contains { $0.originalText == "Newest project now" } }
+
+        // A user choice wins even when this opening's catalog is still in flight.
+        model.popupClosed()
+        model.popupOpened()
+        model.show()
+        model.selectProject(projects[3].root.path)
+        try await wait { model.latestAnswer?.originalText == "Complete answer for session-3" }
+        #expect(model.selectedRoot == projects[3].root.path)
+        model.popupClosed()
+    }
+
+    @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
     func bundledHelperFollowsProjectsAndPreservesOriginalsWithoutCodex() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }

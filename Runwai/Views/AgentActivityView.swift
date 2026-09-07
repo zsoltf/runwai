@@ -10,9 +10,17 @@ struct AgentActivityView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Menu {
-                    ForEach(model.projects) { project in
-                        Button(project.name) { model.selectProject(project.root) }
+                    Section("Recent projects") {
+                        ForEach(model.recentProjects) { project in
+                            Button { model.selectProject(project.root) } label: {
+                                if project.root == model.selectedRoot {
+                                    Label(project.name, systemImage: "checkmark")
+                                } else {
+                                    Text(project.name)
+                                }
+                            }
                             .help(project.root)
+                        }
                     }
                     Divider()
                     Button("Choose Folder...") { model.chooseFolder() }
@@ -22,6 +30,8 @@ struct AgentActivityView: View {
                         .lineLimit(1)
                 }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.visible)
+                .accessibilityLabel("Recent projects")
                 Spacer()
                 Text(model.status)
                     .font(.caption).foregroundStyle(.secondary)

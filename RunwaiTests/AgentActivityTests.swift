@@ -5,6 +5,27 @@ import Testing
 @MainActor
 struct AgentActivityTests {
     @Test
+    func recentProjectsUseParsedActivityTimesAndLimitTheMenuToTen() async throws {
+        let suite = "runwai.activity.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = AgentActivityModel(defaults: defaults, executable: nil)
+        defer { model.shutdown() }
+        var items: [[String: Any]] = (1...12).map { index in
+            ["id": "p\(index)", "root": "/p\(index)", "name": "Project \(index)",
+             "last_activity": String(format: "2026-09-06T%02d:00:00Z", index)]
+        }
+        items += [
+            ["id": "offset", "root": "/offset", "name": "Offset", "last_activity": "2026-09-06T06:00:00-07:00"],
+            ["id": "fractional", "root": "/fractional", "name": "Fractional", "last_activity": "2026-09-06T13:00:00.100Z"],
+            ["id": "unknown", "root": "/unknown", "name": "Unknown", "last_activity": "invalid"]
+        ]
+        await model.apply(try event("projects", generation: 0, payload: ["items": items]))
+        #expect(model.projects.count == 15)
+        #expect(model.recentProjects.map(\.id) == ["fractional", "offset", "p12", "p11", "p10", "p9", "p8", "p7", "p6", "p5"])
+    }
+
+    @Test
     func switchingIgnoresOldResultsAndRestoresCachedMessages() async throws {
         let suite = "runwai.activity.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
