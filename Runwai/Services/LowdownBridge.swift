@@ -41,6 +41,10 @@ struct LowdownEvent: Decodable, Sendable {
         let helperVersion: String?
         let sourceRevision: String?
         let source: String?
+        let operation: String?
+        let catalogRevision: UInt64?
+        let revision: UInt64?
+        let errorSeq: UInt64?
         let capabilities: [String]?
         let items: [LowdownItem]?
         let projectId: String?

@@ -22,9 +22,9 @@ struct AgentActivityTests {
         let failedA = try #require(model.loadOriginal(first))
         let failedB = try #require(model.loadOriginal(second))
         await model.apply(try event("error", generation: 1, requestID: failedA,
-            payload: ["code": "read_failed", "message": "A failed"]))
+            payload: ["operation": "read_message", "code": "read_failed", "message": "A failed"]))
         await model.apply(try event("error", generation: 1, requestID: failedB,
-            payload: ["code": "read_failed", "message": "B failed"]))
+            payload: ["operation": "read_message", "code": "read_failed", "message": "B failed"]))
         let retry = try #require(model.loadOriginal(first))
         #expect(model.errorMessage == "A failed")
         await model.apply(try event("message_text", generation: 1, requestID: failedA,
@@ -56,7 +56,7 @@ struct AgentActivityTests {
         defer { model.shutdown() }
         model.selectProject("/project")
         await model.apply(try event("snapshot", generation: 1, payload: ["messages": [message("a", text: "Original")]]))
-        let failure: [String: Any] = ["code": "model_failed", "message": "Summary failed"]
+        let failure: [String: Any] = ["operation": "summarize", "code": "model_failed", "message": "Summary failed"]
         let items = [["message_id": "a", "text": "Summary"]]
         await model.apply(try event("error", generation: 1, payload: failure))
         await model.apply(try event("state", generation: 1, payload: ["summary_status": "ready"]))
@@ -94,8 +94,8 @@ struct AgentActivityTests {
         model.selectProject("/project")
         await model.apply(try event("snapshot", generation: 1, payload: ["messages": [], "has_more": true, "before_cursor": "older"]))
         let page = try #require(model.loadOlder())
-        await model.apply(try event("error", generation: 1, requestID: page, payload: ["code": "read_failed", "message": "Page failed"]))
-        await model.apply(try event("error", generation: 1, payload: ["code": "model_failed", "message": "Summary failed"]))
+        await model.apply(try event("error", generation: 1, requestID: page, payload: ["operation": "load_older", "code": "read_failed", "message": "Page failed"]))
+        await model.apply(try event("error", generation: 1, payload: ["operation": "summarize", "code": "model_failed", "message": "Summary failed"]))
         let retry = try #require(model.loadOlder())
         #expect(model.errorMessage == "Page failed")
         await model.apply(try event("page", generation: 1, requestID: page, payload: ["messages": []]))
@@ -107,7 +107,7 @@ struct AgentActivityTests {
     }
 
     @Test
-    func followReadAndCacheBusyFailuresHaveIndependentRecovery() async throws {
+    func followRecoveryRequiresExactFailureScopeAndPreservesOtherFailures() async throws {
         let suite = "runwai.activity.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -115,17 +115,40 @@ struct AgentActivityTests {
         defer { model.shutdown() }
         model.selectProject("/project")
         await model.apply(try event("snapshot", generation: 1, payload: ["messages": [message("a", text: "Original")]]))
-        await model.apply(try event("error", generation: 1, payload: ["code": "read_failed", "message": "Follow failed"]))
-        await model.apply(try event("error", generation: 1, payload: ["code": "cache_busy", "message": "Cache busy"]))
+        let failure: [String: Any] = ["operation": "follow", "code": "read_failed", "message": "Follow failed"]
+        await model.apply(try event("error", generation: 1, sequence: 10, payload: failure))
+        await model.apply(try event("error", generation: 1, sequence: 11, payload: failure))
+        await model.apply(try event("error", generation: 1, payload: ["operation": "summarize", "code": "cache_busy", "message": "Cache busy"]))
         await model.apply(try event("state", generation: 1, payload: ["loading": false]))
         #expect(model.errorMessage == "Follow failed")
-        await model.apply(try event("updates", generation: 1, revision: "old", payload: ["messages": []]))
+        await model.apply(try event("updates", generation: 1, payload: ["messages": [message("b", text: "New update")]]))
         #expect(model.errorMessage == "Follow failed")
-        await model.apply(try event("updates", generation: 1, payload: ["messages": []]))
+        let recovery: [String: Any] = ["operation": "follow", "error_seq": 11]
+        await model.apply(try event("recovered", generation: 1, payload: ["operation": "follow", "error_seq": 10]))
+        await model.apply(try event("recovered", generation: 0, payload: recovery))
+        await model.apply(try event("recovered", generation: 1, revision: "old", payload: recovery))
+        await model.apply(try event("recovered", generation: 1, sessionID: "other", payload: recovery))
+        await model.apply(try event("recovered", generation: 1, requestID: "other", payload: recovery))
+        await model.apply(try event("recovered", generation: 1, payload: ["operation": "summarize", "error_seq": 11]))
+        #expect(model.errorMessage == "Follow failed")
+        await model.apply(try event("recovered", generation: 1, payload: recovery))
         #expect(model.errorMessage == "Cache busy")
         await model.apply(try event("summaries", generation: 1, payload: ["source": "cache", "items": [["message_id": "a", "text": "Cached"]]]))
         #expect(model.errorMessage == "Cache busy")
         await model.apply(try event("summaries", generation: 1, payload: ["source": "model", "items": [["message_id": "a", "text": "Fresh"]]]))
+        #expect(model.errorMessage == nil)
+        await model.apply(try event("error", generation: 1, sequence: 20, payload: failure))
+        await model.apply(try event("recovered", generation: 1, payload: recovery))
+        #expect(model.errorMessage == "Follow failed")
+        await model.apply(try event("reset", generation: 1, revision: "replacement", payload: [:]))
+        #expect(model.errorMessage == nil)
+        await model.apply(try event("snapshot", generation: 1, revision: "replacement", payload: ["messages": []]))
+        await model.apply(try event("error", generation: 1, revision: "replacement", sequence: 21, payload: failure))
+        await model.apply(try event("recovered", generation: 1, payload: ["operation": "follow", "error_seq": 21]))
+        #expect(model.errorMessage == "Follow failed")
+        model.selectProject("/other")
+        #expect(model.errorMessage == nil)
+        await model.apply(try event("error", generation: 1, sequence: 22, payload: failure))
         #expect(model.errorMessage == nil)
     }
 
@@ -158,14 +181,67 @@ struct AgentActivityTests {
         #expect(model.errorMessage == nil)
     }
 
+    @Test
+    func partialCatalogRetainsFailureAndOnlyLaterFullRevisionRecovers() async throws {
+        let suite = "runwai.activity.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = AgentActivityModel(defaults: defaults, executable: nil)
+        defer { model.shutdown() }
+        await model.apply(try event("error", generation: nil, requestID: "discover",
+            payload: ["operation": "discover", "catalog_revision": 1, "code": "discovery_failed", "message": "Catalog failed"]))
+        await model.apply(try event("projects", generation: nil, requestID: "discover",
+            payload: ["revision": 1, "partial": true, "items": []]))
+        #expect(model.catalogPartial)
+        #expect(model.errorMessage == "Catalog failed")
+        let selection = model.selectProject("/project")
+        await model.apply(try event("snapshot", generation: 1, requestID: selection, payload: ["messages": []]))
+        #expect(model.errorMessage == "Catalog failed")
+        await model.apply(try event("error", generation: nil,
+            payload: ["operation": "discover", "catalog_revision": 2, "code": "discovery_failed", "message": "Periodic catalog failed"]))
+        await model.apply(try event("projects", generation: nil, payload: ["revision": 2, "partial": true, "items": []]))
+        await model.apply(try event("projects", generation: nil, payload: ["revision": 1, "partial": false, "items": []]))
+        #expect(model.errorMessage == "Periodic catalog failed")
+        #expect(model.catalogPartial)
+        await model.apply(try event("error", generation: 1,
+            payload: ["operation": "summarize", "code": "model_failed", "message": "Summary failed"]))
+        await model.apply(try event("projects", generation: nil, payload: ["revision": 3, "partial": false, "items": []]))
+        #expect(!model.catalogPartial)
+        #expect(model.errorMessage == "Summary failed")
+        await model.apply(try event("error", generation: nil, payload: ["message": "Connection failed"]))
+        await model.apply(try event("projects", generation: nil, payload: ["revision": 4, "partial": false, "items": []]))
+        #expect(model.errorMessage == "Connection failed")
+        await model.apply(try event("snapshot", generation: 1, payload: ["messages": []]))
+        #expect(model.errorMessage == "Connection failed")
+        await model.apply(try event("hello", generation: 0, payload: [:]))
+        #expect(model.errorMessage == nil)
+    }
+
+    @Test
+    func newConnectionCatalogRevisionsDoNotPrematurelyClearOldWarning() async throws {
+        let suite = "runwai.activity.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = AgentActivityModel(defaults: defaults, executable: nil)
+        defer { model.shutdown() }
+        await model.apply(try event("error", generation: nil, payload: [
+            "operation": "discover", "catalog_revision": 50, "message": "Catalog failed"]))
+        await model.apply(try event("hello", generation: 0, payload: [:]))
+        #expect(model.errorMessage == "Catalog failed")
+        await model.apply(try event("projects", generation: nil, payload: ["revision": 1, "partial": true, "items": []]))
+        #expect(model.errorMessage == "Catalog failed")
+        await model.apply(try event("projects", generation: nil, payload: ["revision": 2, "partial": false, "items": []]))
+        #expect(model.errorMessage == nil)
+    }
+
     @Test(.timeLimit(.minutes(1)))
-    func catalogAndConnectionFailuresSurviveUnrelatedSelectionAndStaleCatalog() async throws {
+    func discoveryCommandFailureRequiresActiveRequestAndAcceptedRetry() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let executable = directory.appendingPathComponent("fixture-helper")
-        // This helper only captures real outgoing command IDs; events below are
-        // offline protocol fixtures, not discovery or model-service evidence.
+        // Capture command IDs from the real model/transport. Replies below are
+        // protocol fixtures; periodic scan recovery is covered by the real helper.
         let script = """
         #!/bin/sh
         printf '%s\\n' '{"v":1,"event":"hello","seq":1,"payload":{}}'
@@ -178,38 +254,43 @@ struct AgentActivityTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let model = AgentActivityModel(defaults: defaults, executable: executable)
         defer { model.shutdown() }
+        model.popupOpened()
         model.show()
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-        while !model.isConnected, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
-        try #require(model.isConnected)
-        func discoverIDs() -> [String] {
+        func commands() -> [[String: Any]] {
             guard let text = try? String(contentsOfFile: executable.path + ".commands", encoding: .utf8) else { return [] }
             return text.split(separator: "\n").compactMap {
-                guard let value = try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any],
-                      value["command"] as? String == "discover" else { return nil }
-                return value["id"] as? String
-            }
+                try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]
+            }.filter { $0["command"] as? String == "discover" }
         }
-        while discoverIDs().isEmpty, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
-        let firstCatalog = try #require(discoverIDs().first)
-        await model.apply(try event("error", generation: nil, requestID: firstCatalog,
-            payload: ["code": "read_failed", "message": "Catalog failed"]))
-        let selection = model.selectProject("/project")
-        await model.apply(try event("snapshot", generation: 1, requestID: selection, payload: ["messages": []]))
-        #expect(model.errorMessage == "Catalog failed")
-        while discoverIDs().count < 2, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
-        let currentCatalog = try #require(discoverIDs().last)
-        #expect(currentCatalog != firstCatalog)
-        await model.apply(try event("projects", generation: nil, requestID: firstCatalog, payload: ["items": []]))
-        #expect(model.errorMessage == "Catalog failed")
-        await model.apply(try event("error", generation: 1, requestID: currentCatalog,
-            payload: ["code": "limit_exceeded", "message": "Catalog still failed"]))
-        await model.apply(try event("error", generation: nil, payload: ["message": "Connection failed"]))
-        await model.apply(try event("projects", generation: nil, requestID: currentCatalog, payload: ["items": []]))
-        #expect(model.errorMessage == "Connection failed")
-        await model.apply(try event("snapshot", generation: 1, payload: ["messages": []]))
-        #expect(model.errorMessage == "Connection failed")
-        await model.apply(try event("hello", generation: 0, payload: [:]))
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while commands().isEmpty, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        let first = try #require(commands().first?["id"] as? String)
+        #expect(model.isLoading)
+        let rejected: [String: Any] = ["operation": "discover", "code": "limit_exceeded", "message": "Discovery busy"]
+        await model.apply(try event("error", generation: nil, requestID: "unrelated", payload: rejected))
+        await model.apply(try event("error", generation: nil, payload: rejected))
+        #expect(model.errorMessage == nil)
+        #expect(model.isLoading)
+        await model.apply(try event("error", generation: nil, requestID: first, payload: rejected))
+        #expect(model.errorMessage == "Discovery busy")
+        #expect(!model.isLoading)
+        #expect(model.isConnected)
+        await model.apply(try event("error", generation: nil, payload: [
+            "operation": "discover", "catalog_revision": 1, "message": "Catalog incomplete"]))
+        await model.apply(try event("projects", generation: nil, payload: ["revision": 1, "partial": true, "items": []]))
+        #expect(model.errorMessage == "Discovery busy")
+        model.show()
+        while commands().count < 2, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        let retry = try #require(commands().last?["id"] as? String)
+        #expect(retry != first)
+        #expect(model.errorMessage == "Discovery busy")
+        await model.apply(try event("projects", generation: nil, requestID: first, payload: ["revision": 1, "partial": true, "items": []]))
+        #expect(model.errorMessage == "Discovery busy")
+        await model.apply(try event("projects", generation: nil, requestID: retry, payload: ["revision": 2, "partial": true, "items": []]))
+        #expect(model.errorMessage == "Catalog incomplete")
+        await model.apply(try event("error", generation: nil, requestID: first, payload: rejected))
+        #expect(model.errorMessage == "Catalog incomplete")
+        await model.apply(try event("projects", generation: nil, payload: ["revision": 3, "partial": false, "items": []]))
         #expect(model.errorMessage == nil)
     }
 
@@ -298,7 +379,7 @@ struct AgentActivityTests {
         await model.apply(try event("snapshot", generation: 1, payload: [
             "messages": [message("a", text: "Progress")], "latest_answer": message("final", text: "Full answer", kind: "final")]))
         await model.apply(try event("page", generation: 1, payload: ["messages": [message("older", text: "Older answer", kind: "final")]]))
-        await model.apply(try event("error", generation: 1, payload: ["code": "model_unavailable", "message": "Codex unavailable", "recoverable": true]))
+        await model.apply(try event("error", generation: 1, payload: ["operation": "summarize", "code": "model_unavailable", "message": "Codex unavailable", "recoverable": true]))
         #expect(model.latestAnswer?.id == "final")
         #expect(model.messages.count == 2)
         #expect(model.messages.contains { $0.originalText == "Progress" })
@@ -330,7 +411,7 @@ struct AgentActivityTests {
         let request = model.selectProject("/a")
         #expect(!model.messages.isEmpty)
         await model.apply(try event("error", generation: 3, requestID: request,
-            payload: ["code": "not_found", "message": "Session removed", "recoverable": true]))
+            payload: ["operation": "select", "code": "not_found", "message": "Session removed", "recoverable": true]))
         #expect(model.messages.isEmpty)
         #expect(model.latestAnswer == nil)
         #expect(!model.hasActiveSelection)
@@ -356,7 +437,7 @@ struct AgentActivityTests {
         let bRequest = model.loadOriginal(b)
         let page = model.loadOlder()
         await model.apply(try event("error", generation: 1, requestID: aRequest,
-            payload: ["code": "read_failed", "message": "Missing original", "recoverable": true]))
+            payload: ["operation": "read_message", "code": "read_failed", "message": "Missing original", "recoverable": true]))
         #expect(model.isOriginalLoading("b"))
         #expect(model.isLoadingOlder)
         await model.apply(try event("message_text", generation: 1, requestID: bRequest,
@@ -461,9 +542,11 @@ struct AgentActivityTests {
          "source_ref": ["session_path": "/fixture/rollout.jsonl", "byte_offset": 120]]
     }
 
-    private func event(_ name: String, generation: UInt64?, requestID: String? = nil, revision: String? = nil, payload: [String: Any]) throws -> LowdownEvent {
-        let json: [String: Any] = ["v": 1, "seq": 1, "event": name, "generation": generation as Any? ?? NSNull(),
-            "request_id": requestID as Any? ?? NSNull(), "session_id": "session", "session_revision": revision ?? "r\(generation ?? 0)", "payload": payload]
+    private func event(_ name: String, generation: UInt64?, requestID: String? = nil, revision: String? = nil,
+                       sequence: UInt64 = 1, sessionID: String = "session", payload: [String: Any]) throws -> LowdownEvent {
+        let json: [String: Any] = ["v": 1, "seq": sequence, "event": name, "generation": generation as Any? ?? NSNull(),
+            "request_id": requestID as Any? ?? NSNull(), "session_id": generation.map { _ in sessionID } as Any? ?? NSNull(),
+            "session_revision": generation.map { revision ?? "r\($0)" } as Any? ?? NSNull(), "payload": payload]
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(LowdownEvent.self, from: JSONSerialization.data(withJSONObject: json))

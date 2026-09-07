@@ -40,8 +40,10 @@ final class AgentActivityModel {
     var isLoadingOlder = false
     var summaryStatus = "raw"
     var errorMessage: String? {
-        connectionFailure ?? catalogFailure ?? selectionFailure?.message ?? pageFailure ?? summaryFailure
-            ?? originalFailures.sorted { $0.key < $1.key }.first?.value
+        if let failure = connectionFailure ?? discoveryCommandFailure ?? catalogFailure?.message { return failure }
+        if let failure = selectionFailure?.message { return failure }
+        if let failure = followFailure?.message ?? pageFailure ?? summaryFailure { return failure }
+        return originalFailures.sorted { $0.key < $1.key }.first?.value
     }
     var catalogPartial = false
     var historyPartial = false
@@ -69,12 +71,15 @@ final class AgentActivityModel {
     private enum Request { case selection, page, original(String) }
     private var requests: [String: Request] = [:]
     private var connectionFailure: String?
-    private var catalogFailure: String?
+    private var discoveryCommandFailure: String?
+    private var catalogRequestID: String?
+    private var catalogFailure: (revision: UInt64?, message: String)?
+    private var catalogRevision: UInt64?
     private var selectionFailure: (requestID: String?, message: String)?
+    private var followFailure: (sequence: UInt64, generation: UInt64, sessionID: String?, revision: String, message: String)?
     private var pageFailure: String?
     private var summaryFailure: String?
     private var originalFailures: [String: String] = [:]
-    private var catalogRequestID: String?
     private var visible = false
     private var wantsRecentProject = false
     private var recentDiscoveryID: String?
@@ -324,6 +329,8 @@ final class AgentActivityModel {
         if event.event == "hello" {
             isConnected = true
             connectionFailure = nil
+            catalogRevision = nil
+            if let failure = catalogFailure { catalogFailure = (nil, failure.message) }
             if wantsRecentProject && visible {
                 isLoading = true
                 discoverMostRecent()
@@ -337,7 +344,16 @@ final class AgentActivityModel {
             return
         }
         if event.event == "projects" {
-            if let id = event.requestId, id == catalogRequestID { catalogFailure = nil }
+            if let received = payload.revision {
+                guard catalogRevision.map({ received >= $0 }) ?? true else { return }
+                catalogRevision = received
+                if payload.partial == false, let failure = catalogFailure,
+                   failure.revision.map({ received > $0 }) ?? true { catalogFailure = nil }
+                if let requestID = event.requestId, requestID == catalogRequestID {
+                    discoveryCommandFailure = nil
+                    catalogRequestID = nil
+                }
+            }
             projects = (payload.items ?? []).compactMap {
                 guard let id = $0.id, let root = $0.root, let name = $0.name else { return nil }
                 return Project(id: id, root: root, name: name,
@@ -359,6 +375,7 @@ final class AgentActivityModel {
             return
         }
         if event.event == "sessions", let project = payload.projectId {
+            if let received = payload.revision, let catalogRevision, received < catalogRevision { return }
             sessionsByProject[project] = (payload.items ?? []).compactMap {
                 guard let id = $0.id, let path = $0.path else { return nil }
                 return Session(id: id, path: path, lastActivity: $0.lastActivity)
@@ -370,8 +387,20 @@ final class AgentActivityModel {
             }
             return
         }
-        if event.event == "error", let id = event.requestId, id == catalogRequestID {
-            catalogFailure = payload.message
+        if event.event == "error", payload.operation == "discover" {
+            guard event.generation == nil, event.sessionId == nil, event.sessionRevision == nil else { return }
+            guard let received = payload.catalogRevision else {
+                // Command validation failed before any catalog scan was accepted.
+                guard let requestID = event.requestId, requestID == catalogRequestID else { return }
+                discoveryCommandFailure = payload.message
+                catalogRequestID = nil
+                if generation == 0 || requestID == recentDiscoveryID { isLoading = false }
+                if requestID == recentDiscoveryID { recentDiscoveryID = nil }
+                return
+            }
+            guard catalogRevision.map({ received >= $0 }) ?? true else { return }
+            catalogRevision = received
+            catalogFailure = payload.message.map { (received, $0) }
             if generation == 0 { isLoading = false }
             return
         }
@@ -401,7 +430,7 @@ final class AgentActivityModel {
         }
         switch event.event {
         case "snapshot", "updates", "page":
-            if event.event != "page", let failure = selectionFailure,
+            if event.event == "snapshot", let failure = selectionFailure,
                failure.requestID == event.requestId { selectionFailure = nil }
             if event.event == "page", let id = event.requestId, case .page = requests[id] { pageFailure = nil }
             if let coverage = payload.readCoverage {
@@ -435,6 +464,12 @@ final class AgentActivityModel {
             isLoading = payload.loading ?? isLoading
             isPaused = payload.paused ?? isPaused
             summaryStatus = payload.summaryStatus ?? summaryStatus
+        case "recovered":
+            if payload.operation == "follow", event.requestId == nil, let failure = followFailure,
+               payload.errorSeq == failure.sequence, event.generation == failure.generation,
+               event.sessionId == failure.sessionID, event.sessionRevision == failure.revision {
+                followFailure = nil
+            }
         case "message_text":
             guard let id = payload.messageId, let offset = payload.byteOffset, let text = payload.text,
                   let total = payload.totalBytes, let requestID = event.requestId,
@@ -479,25 +514,33 @@ final class AgentActivityModel {
                 requests[requestID] = nil
             } else { textTransfers[id] = bytes }
         case "error":
-            if let id = event.requestId, let request = requests.removeValue(forKey: id) {
-                switch request {
-                case .selection:
+            if let id = event.requestId, let request = requests[id] {
+                switch (request, payload.operation) {
+                case (.selection, "select"):
+                    requests[id] = nil
                     selectionFailure = payload.message.map { (id, $0) }
                     messages = []; summaries = [:]; latestAnswer = nil; revision = nil
                     hasActiveSelection = false; isLoading = false
-                case .page:
+                case (.page, "load_older"):
+                    requests[id] = nil
                     pageFailure = payload.message
                     isLoadingOlder = false
-                case .original(let messageID):
+                case (.original(let messageID), "read_message"):
+                    requests[id] = nil
                     originalFailures[messageID] = payload.message
                     pendingText.remove(messageID); textTransfers[messageID] = nil
                     await originalStore.discard(key: id)
+                default:
+                    connectionFailure = payload.message
                 }
-            } else if payload.code == "model_failed" || payload.code == "model_unavailable" || payload.code == "cache_busy" {
+            } else if payload.operation == "summarize" {
                 summaryFailure = payload.message
                 summaryStatus = "unavailable"
-            } else if event.requestId == nil {
-                selectionFailure = payload.message.map { (nil, $0) }
+            } else if payload.operation == "follow", event.requestId == nil,
+                      let current = revision, event.sessionRevision == current {
+                followFailure = payload.message.map { (event.seq, generation, event.sessionId, current, $0) }
+            } else if !["select", "follow", "load_older", "read_message", "summarize"].contains(payload.operation ?? "") {
+                connectionFailure = payload.message
             }
         default: break
         }
@@ -505,6 +548,7 @@ final class AgentActivityModel {
 
     private func retireSelectionFailures() {
         selectionFailure = nil
+        followFailure = nil
         pageFailure = nil
         summaryFailure = nil
         originalFailures = [:]

@@ -9,6 +9,74 @@ import Darwin
 @MainActor
 struct LowdownIntegrationTests {
     @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
+    func emptyFollowRecoveryPreservesUnrelatedSummaryWarning() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let project = try fixture.session(project: "follow", name: "recover", count: 0)
+        try fixture.append("Uncached progress", to: project.path)
+        let model = AgentActivityModel(defaults: fixture.defaults,
+            executable: try #require(LowdownBridge.bundledExecutable), environment: fixture.environment)
+        defer { model.shutdown() }
+        model.show()
+        try await wait { !model.projects.isEmpty }
+        model.selectProject(project.root.path)
+        try await wait { model.hasActiveSelection && model.summaryStatus == "unavailable" && model.errorMessage != nil }
+        let summaryWarning = try #require(model.errorMessage)
+        let revision = model.revision
+        let generation = model.generation
+        let messageIDs = model.messages.map(\.id)
+        let held = project.path.appendingPathExtension("held")
+        try FileManager.default.moveItem(at: project.path, to: held)
+        try await wait(description: "actual follow read failure") { model.errorMessage != summaryWarning }
+        #expect(model.errorMessage != nil)
+        // Restore the same inode and bytes. A successful empty read emits only
+        // the correlated recovery signal, not a replacement snapshot/update.
+        try FileManager.default.moveItem(at: held, to: project.path)
+        try await wait(description: "empty follow recovery preserving summary failure") { model.errorMessage == summaryWarning }
+        #expect(model.revision == revision)
+        #expect(model.generation == generation)
+        #expect(model.messages.map(\.id) == messageIDs)
+        #expect(model.hasActiveSelection && model.isConnected)
+        try await Task.sleep(for: .milliseconds(900))
+        #expect(model.errorMessage == summaryWarning)
+        #expect(model.messages.map(\.id) == messageIDs)
+    }
+
+    @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(2)))
+    func periodicPartialCatalogRetainsWarningUntilFullRecovery() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let project = try fixture.session(project: "catalog", name: "recover", count: 0)
+        try fixture.append("Uncached progress", to: project.path)
+        let model = AgentActivityModel(defaults: fixture.defaults,
+            executable: try #require(LowdownBridge.bundledExecutable), environment: fixture.environment)
+        defer { model.shutdown() }
+        model.show()
+        try await wait { !model.projects.isEmpty }
+        model.selectProject(project.root.path)
+        try await wait { model.hasActiveSelection && model.summaryStatus == "unavailable" && model.errorMessage != nil }
+        let summaryWarning = try #require(model.errorMessage)
+        let revision = model.revision
+        let store = fixture.directory.appendingPathComponent("codex/sessions")
+        let held = store.appendingPathExtension("held")
+        try FileManager.default.moveItem(at: store, to: held)
+        try Data("not a directory".utf8).write(to: store)
+        // No discover command: the normal 30-second catalog poll has no request ID.
+        try await wait(timeout: .seconds(35), description: "periodic partial catalog") { model.catalogPartial }
+        let catalogWarning = try #require(model.errorMessage)
+        #expect(catalogWarning != summaryWarning)
+        #expect(model.isConnected)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(model.errorMessage == catalogWarning)
+        try FileManager.default.removeItem(at: store)
+        try FileManager.default.moveItem(at: held, to: store)
+        try await wait(timeout: .seconds(35), description: "periodic full catalog recovery") { !model.catalogPartial }
+        #expect(model.errorMessage == summaryWarning)
+        #expect(model.revision == revision)
+        #expect(model.hasActiveSelection && model.isConnected)
+    }
+
+    @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
     func completionEchoesPreserveCanonicalIdentityAndDistinctEqualTextTurns() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
