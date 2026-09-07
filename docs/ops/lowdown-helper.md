@@ -8,9 +8,9 @@ work: the public Lowdown 0.1.0 executable does not implement it.
 
 Current development pin:
 
-- Source: `4825df2ec0bfa968a69f589dcf0f68bc3e0a785c`
+- Source: `d894a3d643c106fb1b3fc4c95dc2eb4ac8e1e8b9`
 - Target: `aarch64-apple-darwin` (Apple Silicon only)
-- SHA-256: `f620db95072e1b33448254e8e8e77feab3bf0cb21d4915faccbb5c9180005cf9`
+- SHA-256: `d8bfaba3c26f027e05d5120ac3eeb5bbc9e745e11e2ca108b3a28a581a354294`
 
 This candidate is not the public 0.1.0 release. Intel/universal packaging and
 notarization remain release work.

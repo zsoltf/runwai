@@ -36,6 +36,8 @@ struct MarkdownTests {
         #expect(String(preview.characters) == "A clear answer with code.")
         #expect(preview.runs.allSatisfy { $0.link == nil })
         #expect(String(MarkdownDocument.inline("## A heading").characters) == "A heading")
+        #expect(String(MarkdownDocument.inline("# Result\n\nAll checks pass.").characters) == "Result All checks pass.")
+        #expect(String(MarkdownDocument.inline("```swift\nlet ready = true\n```").characters).contains("let ready = true"))
     }
 
     @Test

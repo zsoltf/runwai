@@ -156,7 +156,7 @@ struct AgentActivityView: View {
         guard let original = model.originalText(for: message) else {
             return message.kind == "final" ? "Read full answer" : "Read full update"
         }
-        return original.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init) ?? original
+        return String(original.prefix(4096))
     }
 
     private func timestamp(_ raw: String) -> String {

@@ -43,7 +43,11 @@ struct MarkdownDocument: Sendable {
 
     static func inline(_ source: String) -> AttributedString {
         let bounded = String(source.prefix(4096))
-        var text = (try? AttributedString(markdown: bounded)) ?? AttributedString(bounded)
+        var text = AttributedString()
+        for block in MarkdownDocument(bounded).blocks {
+            if !text.characters.isEmpty { text.append(AttributedString(" ")) }
+            text.append(block.text)
+        }
         // The whole preview is an expansion button, not a nested link target.
         text.link = nil
         return text
