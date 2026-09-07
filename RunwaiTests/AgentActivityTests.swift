@@ -5,6 +5,39 @@ import Testing
 @MainActor
 struct AgentActivityTests {
     @Test
+    func partialReadCoverageStaysQuietAndIsScopedToSelection() async throws {
+        let suite = "runwai.activity.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = AgentActivityModel(defaults: defaults, executable: nil)
+        defer { model.shutdown() }
+        model.selectProject("/project")
+        await model.apply(try event("snapshot", generation: 1, payload: [
+            "messages": [message("recent", text: "Readable recent update")],
+            "read_coverage": ["oversized_records_skipped": true, "scan_limited": false]
+        ]))
+        #expect(model.historyPartial)
+        #expect(model.hasActiveSelection)
+        #expect(model.errorMessage == nil)
+        await model.apply(try event("updates", generation: 1, payload: [
+            "messages": [], "read_coverage": ["oversized_records_skipped": false, "scan_limited": false]
+        ]))
+        #expect(model.historyPartial)
+        model.selectProject("/other")
+        #expect(!model.historyPartial)
+        await model.apply(try event("updates", generation: 1, payload: [
+            "read_coverage": ["oversized_records_skipped": true]
+        ]))
+        #expect(!model.historyPartial)
+        await model.apply(try event("snapshot", generation: 2, payload: [
+            "messages": [], "read_coverage": ["scan_limited": true]
+        ]))
+        #expect(model.historyPartial)
+        await model.apply(try event("reset", generation: 2, payload: [:]))
+        #expect(!model.historyPartial)
+    }
+
+    @Test
     func recentProjectsUseParsedActivityTimesAndLimitTheMenuToTen() async throws {
         let suite = "runwai.activity.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

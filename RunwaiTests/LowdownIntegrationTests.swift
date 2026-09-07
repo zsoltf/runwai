@@ -9,6 +9,34 @@ import Darwin
 @MainActor
 struct LowdownIntegrationTests {
     @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
+    func oversizedSourceStillLoadsRecentDataAndCachedAnswerSummary() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let project = try fixture.session(project: "large", name: "final-only", count: 0)
+        try fixture.append(String(repeating: "x", count: 9 * 1_048_576), to: project.path)
+        try fixture.append("Recent readable update", to: project.path)
+        let model = AgentActivityModel(defaults: fixture.defaults,
+            executable: try #require(LowdownBridge.bundledExecutable), environment: fixture.environment)
+        defer { model.shutdown() }
+        model.show()
+        try await wait { !model.projects.isEmpty }
+        model.selectProject(project.root.path)
+        try await wait { model.hasActiveSelection && !model.isLoading }
+        #expect(model.historyPartial)
+        #expect(model.errorMessage == nil)
+        #expect(model.messages.contains { $0.originalText == "Recent readable update" })
+        let answer = try #require(model.latestAnswer)
+        #expect(answer.originalText == "Complete answer for final-only")
+        try await wait { model.summaries[answer.id] == "Cached answer for final-only" }
+        model.loadOriginal(answer)
+        #expect(model.originalText(for: answer) == "Complete answer for final-only")
+        try fixture.append("Next live arrival", to: project.path)
+        try await wait { model.messages.contains { $0.originalText == "Next live arrival" } }
+        #expect(model.historyPartial)
+        #expect(model.hasActiveSelection)
+    }
+
+    @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
     func popupSelectsNewestProjectButTabSwitchingPreservesManualChoice() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
@@ -176,7 +204,11 @@ struct LowdownIntegrationTests {
                     "summary_version": "rust-codex-scanline-v2:gpt-5.6-luna:none",
                     "summary": "Cached \(name) update", "source": "codex_exec"]
             }
-            try append("Complete answer for \(name)", to: path, final: true)
+            let answer = "Complete answer for \(name)"
+            try append(answer, to: path, final: true)
+            entries["\(milliseconds):\(hash(answer))"] = [
+                "summary_version": "rust-codex-scanline-v2:gpt-5.6-luna:none",
+                "summary": "Cached answer for \(name)", "source": "codex_exec"]
             let cache = directory.appendingPathComponent("cache/summaries")
             try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
             try JSONSerialization.data(withJSONObject: ["schema_version": 1, "session_path": path.path, "entries": entries])

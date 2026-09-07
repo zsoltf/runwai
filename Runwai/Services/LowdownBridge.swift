@@ -49,6 +49,7 @@ struct LowdownEvent: Decodable, Sendable {
         let answerStatus: String?
         let beforeCursor: String?
         let hasMore: Bool?
+        let readCoverage: ReadCoverage?
         let loading: Bool?
         let paused: Bool?
         let summaryStatus: String?
@@ -61,6 +62,11 @@ struct LowdownEvent: Decodable, Sendable {
         let totalBytes: Int?
         let text: String?
         let done: Bool?
+    }
+
+    struct ReadCoverage: Decodable, Sendable {
+        let oversizedRecordsSkipped: Bool?
+        let scanLimited: Bool?
     }
 }
 

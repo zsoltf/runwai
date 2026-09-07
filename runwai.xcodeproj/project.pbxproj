@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		00AF4DADA8CD26E80867AA3A /* GlassAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F794BB1960188E5DE605029 /* GlassAppearance.swift */; };
+		04504BEC12CDED86F1F942A2 /* MarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B938FA5F27A66C460BA225 /* MarkdownText.swift */; };
 		04E19B0482D94FF99C10BA08 /* UsageSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = C44F1C6A5EA088A65122074F /* UsageSnapshot.swift */; };
 		05D027FDD034DC981B64609A /* UsageSourceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3F230A310AABEF8BB88841F /* UsageSourceMode.swift */; };
 		1144C74E6FCD816C8B7A8D2B /* AgentActivityModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 728B91F42D015B34FB2248CA /* AgentActivityModel.swift */; };
@@ -25,6 +26,7 @@
 		5A167B8F33BE93C1D4E5527E /* CodexQuotaSyncServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A83EC89F19A53F63E438576 /* CodexQuotaSyncServiceTests.swift */; };
 		5D90B1B3F6B7574273A5B807 /* Lowdown-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 8850E819223BCB170468AE34 /* Lowdown-LICENSE.txt */; };
 		6C80D80B730EEDB860936AFF /* UsageHistoryPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43B02C6524D122FCF0899CE /* UsageHistoryPoint.swift */; };
+		723E6DCBBB7B564C67C1A630 /* MarkdownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AC85C8594FC609A84A628ED /* MarkdownTests.swift */; };
 		7AF27707804245ED7D381023 /* RunwaiPacingBars.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276A4C9DD6AC60FC983E64BB /* RunwaiPacingBars.swift */; };
 		8C929E7172D2B5DE469F34C8 /* HeroStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B966FCBA97F5C985535DF93A /* HeroStyle.swift */; };
 		9B17D52229EC89AE7EF21322 /* gemini_quota_snapshot.mjs in Resources */ = {isa = PBXBuildFile; fileRef = B86EA1AAAA3A0E704FF2564D /* gemini_quota_snapshot.mjs */; };
@@ -71,7 +73,9 @@
 		6E9D303591F968D8B4C5184B /* RunwaiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunwaiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		728B91F42D015B34FB2248CA /* AgentActivityModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentActivityModel.swift; sourceTree = "<group>"; };
 		7A83EC89F19A53F63E438576 /* CodexQuotaSyncServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexQuotaSyncServiceTests.swift; sourceTree = "<group>"; };
+		7AC85C8594FC609A84A628ED /* MarkdownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTests.swift; sourceTree = "<group>"; };
 		7EE9BA4735576FB21DA08353 /* UsageActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageActivityView.swift; sourceTree = "<group>"; };
+		85B938FA5F27A66C460BA225 /* MarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownText.swift; sourceTree = "<group>"; };
 		8850E819223BCB170468AE34 /* Lowdown-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Lowdown-LICENSE.txt"; sourceTree = "<group>"; };
 		89750543B58B0A79FD0C04C8 /* UsageActivitySeriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageActivitySeriesTests.swift; sourceTree = "<group>"; };
 		93BA3061A6E6E23799E456E7 /* UsageMonitorModel+Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UsageMonitorModel+Storage.swift"; sourceTree = "<group>"; };
@@ -103,6 +107,7 @@
 				28619F526FEABE88ACD7B910 /* AgentActivityTests.swift */,
 				7A83EC89F19A53F63E438576 /* CodexQuotaSyncServiceTests.swift */,
 				BEBAB5CFCEC01F054F2517B1 /* LowdownIntegrationTests.swift */,
+				7AC85C8594FC609A84A628ED /* MarkdownTests.swift */,
 				A6C1943C1AB9962FE71A97E3 /* PacingCalculatorTests.swift */,
 				89750543B58B0A79FD0C04C8 /* UsageActivitySeriesTests.swift */,
 			);
@@ -168,6 +173,7 @@
 			isa = PBXGroup;
 			children = (
 				560DB72331FB15A76BB4E034 /* AgentActivityView.swift */,
+				85B938FA5F27A66C460BA225 /* MarkdownText.swift */,
 				E698E4E3EB477EF248A5B47C /* MenuBarContentView.swift */,
 				67D50F2FB47D6039A6588632 /* MenuBarContentView+Style.swift */,
 				19D8BD662762438F541C56D3 /* MenuBarLabelView.swift */,
@@ -334,6 +340,7 @@
 				F2A1ECD8058444417B1A0D15 /* LowdownBridge.swift in Sources */,
 				CE29EBEE336EB9F22D8E80CD /* LowdownOriginalStore.swift in Sources */,
 				57CF5BA373E6E628BB1E0761 /* ManualUsageStore.swift in Sources */,
+				04504BEC12CDED86F1F942A2 /* MarkdownText.swift in Sources */,
 				44D0AF293725957BD35B4273 /* MenuBarContentView+Style.swift in Sources */,
 				4AF3A22D008AC8119365BC43 /* MenuBarContentView.swift in Sources */,
 				FD917A8A01609AC2D2E6FC03 /* MenuBarLabelView.swift in Sources */,
@@ -362,6 +369,7 @@
 				E38CFD988E991747E179E168 /* AgentActivityTests.swift in Sources */,
 				5A167B8F33BE93C1D4E5527E /* CodexQuotaSyncServiceTests.swift in Sources */,
 				9BBCB2C5E31851A52D4D8779 /* LowdownIntegrationTests.swift in Sources */,
+				723E6DCBBB7B564C67C1A630 /* MarkdownTests.swift in Sources */,
 				C1C56995D64A566A5C622FD2 /* PacingCalculatorTests.swift in Sources */,
 				2CC30C992B2715093EB3D6FE /* UsageActivitySeriesTests.swift in Sources */,
 			);

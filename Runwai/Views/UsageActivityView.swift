@@ -43,13 +43,23 @@ struct UsageActivityView: View {
 
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(data.pointsPerHour.map { model.formattedNumber($0) } ?? "--")
-                        .font(.system(size: 44, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(text)
-                    Text("pts / hour \u{00b7} average burn")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(secondaryText)
+                    if let rate = data.pointsPerHour {
+                        Text(model.formattedNumber(rate))
+                            .font(.system(size: 44, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(text)
+                        Text("pts / hour \u{00b7} average burn")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(secondaryText)
+                    } else {
+                        Image(systemName: "waveform.path")
+                            .font(.system(size: 30, weight: .light))
+                            .foregroundStyle(tint)
+                            .padding(.bottom, 6)
+                        Text(data.points.isEmpty ? "A fresh start" : "Learning your pace")
+                            .font(.system(size: 20, weight: .semibold, design: .rounded))
+                            .foregroundStyle(text)
+                    }
                 }
                 Spacer()
                 if let reading {
@@ -76,9 +86,11 @@ struct UsageActivityView: View {
                     moveReading(direction == .increment ? 1 : -1, in: data)
                 }
 
-            HStack(spacing: 18) {
-                legend("recorded usage", dashed: false)
-                if data.showsPace { legend("even pace", dashed: true) }
+            if !data.points.isEmpty {
+                HStack(spacing: 18) {
+                    legend("recorded usage", dashed: false)
+                    if data.showsPace { legend("even pace", dashed: true) }
+                }
             }
 
             Rectangle().fill(secondaryText.opacity(0.15)).frame(height: 1)
@@ -96,11 +108,13 @@ struct UsageActivityView: View {
                     }
                 }
                 Spacer(minLength: 0)
-                metric(data.observedUse.map { "\(model.formattedNumber($0))%" } ?? "--", label: "of allowance", caption: "recorded use")
+                if let used = data.observedUse {
+                    metric("\(model.formattedNumber(used))%", label: "of allowance", caption: "recorded use")
+                }
             }
 
-            if data.points.count < 2 {
-                Text("Collecting history")
+            if data.pointsPerHour == nil {
+                Text(data.points.isEmpty ? "Your next readings will appear here." : "Collecting readings for your burn rate.")
                     .font(.caption)
                     .foregroundStyle(secondaryText)
             }
@@ -112,7 +126,7 @@ struct UsageActivityView: View {
 
     private func chart(_ data: UsageActivitySeries, reading: UsageHistoryPoint?) -> some View {
         Chart {
-            if data.showsPace {
+            if data.showsPace && !data.points.isEmpty {
               ForEach([data.domain.lowerBound, data.domain.upperBound], id: \.self) { date in
                 LineMark(x: .value("Time", date), y: .value("Remaining", data.expectedRemaining(at: date)), series: .value("Series", "pace"))
                     .foregroundStyle(secondaryText.opacity(0.5))

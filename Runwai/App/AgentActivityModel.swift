@@ -41,6 +41,7 @@ final class AgentActivityModel {
     var summaryStatus = "raw"
     var errorMessage: String?
     var catalogPartial = false
+    var historyPartial = false
     var hasMore = false
     var generation: UInt64 = 0
     var revision: String?
@@ -242,6 +243,7 @@ final class AgentActivityModel {
         messages = cached?.messages ?? []
         summaries = cached?.summaries ?? [:]
         latestAnswer = cached?.latestAnswer
+        historyPartial = false
         fullTexts = [:]
         originalFiles = [:]
         resetOriginalStore()
@@ -362,6 +364,7 @@ final class AgentActivityModel {
         }
         guard event.generation == generation else { return }
         if event.event == "reset" {
+            historyPartial = false
             revision = event.sessionRevision
             messages = []; summaries = [:]; fullTexts = [:]; latestAnswer = nil
             pendingText = []; textTransfers = [:]; beforeCursor = nil; hasMore = false
@@ -377,6 +380,9 @@ final class AgentActivityModel {
         }
         switch event.event {
         case "snapshot", "updates", "page":
+            if let coverage = payload.readCoverage {
+                historyPartial = historyPartial || coverage.oversizedRecordsSkipped == true || coverage.scanLimited == true
+            }
             if event.event == "snapshot" { messages = [] }
             var byID = Dictionary(messages.map { ($0.id, $0) }, uniquingKeysWith: { _, newest in newest })
             for message in payload.messages ?? [] { byID[message.id] = message }

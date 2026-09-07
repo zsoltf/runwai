@@ -49,6 +49,14 @@ light/dark styling, keyboard access, and a single outer surface.
   events never replace the selected project's content.
 - Full originals and final answers are readable, including large messages.
   Summary failure preserves original text and cached summaries.
+- Final answers use the same summary/cache path as progress messages. Cards
+  distinguish a summary from an original preview. Native Markdown renders
+  headings, lists, quotes, code, emphasis, and links without remote images or HTML.
+- Oversized source records do not make an entire project unavailable. Lowdown
+  keeps bounded reads and returns recent readable messages with partial coverage;
+  Runwai shows that quietly, never pretending skipped records were read.
+- Missing Usage rates remain unknown, not zero. The view shows a collecting-data
+  state rather than placeholder numbers while preserving available readings.
 - Missing Codex, malformed output, helper restart, and slow output consumers
   are handled without interrupting Usage or leaving orphan processes.
 - Routine validation uses offline fixtures. Live model work is a separate,

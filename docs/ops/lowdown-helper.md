@@ -8,9 +8,9 @@ work: the public Lowdown 0.1.0 executable does not implement it.
 
 Current development pin:
 
-- Source: `64591ed94d449fe7c2b0e0578cac3b4f7ff12db7`
+- Source: `4825df2ec0bfa968a69f589dcf0f68bc3e0a785c`
 - Target: `aarch64-apple-darwin` (Apple Silicon only)
-- SHA-256: `dd3a58aeef5e8fd5eee6c6a19e689e794457a25a8111bff5e85ff788ed416456`
+- SHA-256: `f620db95072e1b33448254e8e8e77feab3bf0cb21d4915faccbb5c9180005cf9`
 
 This candidate is not the public 0.1.0 release. Intel/universal packaging and
 notarization remain release work.
@@ -48,6 +48,9 @@ inside an already notarized app.
 - `LowdownIntegrationTests` uses the embedded executable and an explicitly
   missing Codex path to exercise cache, live arrivals, full text and fallback.
   Without an embedded helper, that test is skipped; unit tests still run.
+- Oversized transcript records are skipped within bounded reads; recent readable
+  updates stay available. Activity marks partial history without an error panel.
+- Both progress and final answers use Lowdown's existing summary/cache pipeline.
 - Shared deduplication requires the updated CLI; released older CLIs do not
   participate in the bridge's locking protocol.
 

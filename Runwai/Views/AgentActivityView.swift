@@ -86,6 +86,12 @@ struct AgentActivityView: View {
                     .disabled(model.isLoadingOlder)
                     .frame(maxWidth: .infinity)
             }
+            if model.historyPartial {
+                Label("Recent readable updates", systemImage: "clock")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .help("Some source records were too large or outside the read window. Showing the available updates.")
+            }
         }
         .onChange(of: model.generation) { expanded = [] }
         .onChange(of: model.revision) { expanded = [] }
@@ -94,6 +100,7 @@ struct AgentActivityView: View {
     private func messageRow(_ message: LowdownMessage, latest: Bool = false) -> some View {
         let isExpanded = expanded.contains(message.id)
         let isFinal = message.kind == "final"
+        let headline = MarkdownDocument.inline(model.summaries[message.id] ?? preview(message))
         return VStack(alignment: .leading, spacing: 8) {
             Button {
                 if isExpanded { expanded.remove(message.id) }
@@ -104,12 +111,15 @@ struct AgentActivityView: View {
                         Text(latest ? "latest answer" : isFinal ? "answer" : timestamp(message.timestamp))
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.secondary)
+                        Text(model.summaries[message.id] == nil ? "original" : "summary")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                         Spacer()
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                             .font(.caption2).foregroundStyle(.secondary)
                     }
-                    Text(model.summaries[message.id] ?? preview(message))
-                        .font(.system(size: 14, weight: isFinal ? .semibold : .medium))
+                    Text(headline)
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
@@ -118,14 +128,12 @@ struct AgentActivityView: View {
             }
             .buttonStyle(.plain)
             .disabled(!model.hasActiveSelection && model.originalText(for: message) == nil && model.originalFiles[message.id] == nil)
-            .accessibilityLabel(isExpanded ? "Collapse original" : "Read full original")
+            .accessibilityLabel(Text(headline))
+            .accessibilityHint(isExpanded ? "Collapse original" : "Read full original")
             if isExpanded {
                 if let original = model.originalText(for: message) {
                     Divider()
-                    Text(original)
-                        .font(.system(size: 13))
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
+                    MarkdownText(source: original)
                 } else if let file = model.originalFiles[message.id] {
                     Button("Read complete original") { NSWorkspace.shared.open(file) }
                         .font(.callout)
