@@ -23,7 +23,7 @@ It answers three things fast:
 - how has that changed today and this week?
 - what is my agent working on?
 
-## development build
+## features
 
 - Codex auto-refreshes from your local login, including weekly-only limits
 - chart-first Usage: Day, Full window, and 30-day Historical views
