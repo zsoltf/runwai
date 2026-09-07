@@ -516,16 +516,16 @@ final class AgentActivityModel {
         case "error":
             if let id = event.requestId, let request = requests[id] {
                 switch (request, payload.operation) {
-                case (.selection, "select"):
+                case (.selection, "select"), (.selection, "command"):
                     requests[id] = nil
                     selectionFailure = payload.message.map { (id, $0) }
                     messages = []; summaries = [:]; latestAnswer = nil; revision = nil
                     hasActiveSelection = false; isLoading = false
-                case (.page, "load_older"):
+                case (.page, "load_older"), (.page, "command"):
                     requests[id] = nil
                     pageFailure = payload.message
                     isLoadingOlder = false
-                case (.original(let messageID), "read_message"):
+                case (.original(let messageID), "read_message"), (.original(let messageID), "command"):
                     requests[id] = nil
                     originalFailures[messageID] = payload.message
                     pendingText.remove(messageID); textTransfers[messageID] = nil

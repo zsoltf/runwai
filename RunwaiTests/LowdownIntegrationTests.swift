@@ -9,6 +9,114 @@ import Darwin
 @MainActor
 struct LowdownIntegrationTests {
     @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
+    func overlappingOriginalCommandRejectionReleasesOnlyRejectedRead() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let project = try fixture.session(project: "originals", name: "overlap", count: 0)
+        let firstText = String(repeating: "First original\n", count: 100_000)
+        let secondText = String(repeating: "Second original\n", count: 100_000)
+        try fixture.append(firstText, to: project.path)
+        try fixture.append(secondText, to: project.path)
+        try fixture.cache([firstText, secondText], for: project.path)
+        let model = AgentActivityModel(defaults: fixture.defaults,
+            executable: try #require(LowdownBridge.bundledExecutable), environment: fixture.environment)
+        defer { model.shutdown() }
+        model.show()
+        try await wait { !model.projects.isEmpty }
+        model.selectProject(project.root.path)
+        try await wait { model.hasActiveSelection && !model.isLoading }
+        let first = try #require(model.messages.first { $0.textBytes == firstText.utf8.count })
+        let second = try #require(model.messages.first { $0.textBytes == secondText.utf8.count })
+        #expect(model.errorMessage == nil)
+        try #require(model.loadOriginal(first) != nil)
+        try #require(model.loadOriginal(second) != nil)
+        try await wait(description: "overlapping original preflight rejection") {
+            model.errorMessage == "A text transfer is already active" && !model.isOriginalLoading(second.id)
+        }
+        #expect(model.isOriginalLoading(first.id))
+        #expect(model.originalFiles[second.id] == nil)
+        try await wait { model.originalFiles[first.id] != nil }
+        #expect(!model.isOriginalLoading(first.id))
+        #expect(model.errorMessage == "A text transfer is already active")
+        let firstFile = try #require(model.originalFiles[first.id])
+        #expect(try String(contentsOf: firstFile, encoding: .utf8) == firstText)
+        try #require(model.loadOriginal(second) != nil)
+        #expect(model.errorMessage == "A text transfer is already active")
+        try await wait { model.originalFiles[second.id] != nil }
+        let secondFile = try #require(model.originalFiles[second.id])
+        #expect(try String(contentsOf: secondFile, encoding: .utf8) == secondText)
+        #expect(!model.isOriginalLoading(second.id))
+        #expect(model.errorMessage == nil)
+        #expect(model.hasActiveSelection && model.isConnected)
+    }
+
+    @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
+    func staleCursorCommandRejectionIsRetryableAndPreservesSummaryWarning() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let project = try fixture.session(project: "paging", name: "stale", count: 40)
+        try fixture.append("Uncached progress", to: project.path)
+        let model = AgentActivityModel(defaults: fixture.defaults,
+            executable: try #require(LowdownBridge.bundledExecutable), environment: fixture.environment)
+        defer { model.shutdown() }
+        model.show()
+        try await wait { !model.projects.isEmpty }
+        model.selectProject(project.root.path)
+        try await wait { model.hasActiveSelection && model.summaryStatus == "unavailable" && model.errorMessage != nil }
+        let summaryWarning = try #require(model.errorMessage)
+        let revision = try #require(model.revision)
+        let first = try #require(model.messages.first)
+        let count = model.messages.count
+        // Seed only cursor metadata to reproduce stale consumer state. Commands,
+        // rejection events, and successful page contents come from the helper.
+        func cursor(_ value: String) async throws {
+            let data = try JSONSerialization.data(withJSONObject: [
+                "v": 1, "event": "page", "seq": 1, "generation": model.generation,
+                "session_revision": revision,
+                "payload": ["before_cursor": value, "has_more": true, "messages": []]])
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            await model.apply(try decoder.decode(LowdownEvent.self, from: data))
+        }
+        try await cursor("obsolete-revision:\(first.sourceRef.byteOffset)")
+        try #require(model.loadOlder() != nil)
+        try await wait(description: "stale cursor preflight rejection") {
+            !model.isLoadingOlder && model.errorMessage == "History cursor is not current"
+        }
+        #expect(model.messages.count == count)
+        #expect(model.hasActiveSelection && model.isConnected)
+        try await cursor("\(revision):\(first.sourceRef.byteOffset)")
+        try #require(model.loadOlder() != nil)
+        #expect(model.errorMessage == "History cursor is not current")
+        try await wait { !model.isLoadingOlder && model.messages.count > count }
+        #expect(model.errorMessage == summaryWarning)
+        #expect(model.messages.contains { $0.originalText == "stale update 0" })
+    }
+
+    @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
+    func missingSavedSessionCommandRejectionEndsLoadingAndAllowsSelection() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let project = try fixture.session(project: "selection", name: "present", count: 0)
+        fixture.defaults.set([project.root.path: "missing-session"], forKey: "runwai.activity.sessions")
+        let model = AgentActivityModel(defaults: fixture.defaults,
+            executable: try #require(LowdownBridge.bundledExecutable), environment: fixture.environment)
+        defer { model.shutdown() }
+        model.show()
+        try await wait { !model.projects.isEmpty }
+        model.selectProject(project.root.path)
+        try await wait(description: "missing saved session preflight rejection") {
+            !model.isLoading && model.errorMessage == "Session ID is not in the discovered catalog"
+        }
+        #expect(!model.hasActiveSelection)
+        #expect(model.isConnected)
+        model.selectSession(nil)
+        try await wait { model.hasActiveSelection && !model.isLoading }
+        #expect(model.latestAnswer?.originalText == "Complete answer for present")
+        #expect(model.errorMessage == nil)
+    }
+
+    @Test(.enabled(if: LowdownBridge.bundledExecutable != nil), .timeLimit(.minutes(1)))
     func emptyFollowRecoveryPreservesUnrelatedSummaryWarning() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
@@ -354,6 +462,20 @@ struct LowdownIntegrationTests {
 
         func append(_ text: String, to path: URL, final: Bool = false) throws {
             try appendEvent(["type": "agent_message", "phase": final ? "final_answer" : "commentary", "message": text], to: path)
+        }
+
+        func cache(_ texts: [String], for path: URL) throws {
+            let file = directory.appendingPathComponent("cache/summaries/\(hash(path.path)).json")
+            var cache = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+            var entries = try #require(cache["entries"] as? [String: Any])
+            let milliseconds = Int64(ISO8601DateFormatter().date(from: stamp)!.timeIntervalSince1970 * 1000)
+            for text in texts {
+                entries["\(milliseconds):\(hash(text))"] = [
+                    "summary_version": "rust-codex-scanline-v2:gpt-5.6-luna:none",
+                    "summary": "Cached large original", "source": "codex_exec"]
+            }
+            cache["entries"] = entries
+            try JSONSerialization.data(withJSONObject: cache).write(to: file)
         }
 
         func complete(_ text: String, turn: String, to path: URL) throws {
